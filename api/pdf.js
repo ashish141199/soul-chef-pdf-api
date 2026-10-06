@@ -59,6 +59,18 @@ async function renderPdf(html) {
 }
 
 export default async function handler(req, res) {
+  // Same cross-origin situation as api/parse.js: the page's origin differs
+  // from this function's, so the browser needs an explicit CORS allow,
+  // including its OPTIONS preflight.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Use POST.' });
     return;
