@@ -7,6 +7,19 @@
  * environment variable (set in the Vercel dashboard), not a committed .env.
  */
 export default async function handler(req, res) {
+  // The page is served from a different origin than this function (e.g.
+  // localhost:3000 for local dev, or wherever index.html ends up hosted), so
+  // the browser needs an explicit CORS allow before it will let the fetch
+  // through — including its OPTIONS preflight.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Use POST.' });
     return;
