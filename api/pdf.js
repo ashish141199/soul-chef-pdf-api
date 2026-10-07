@@ -193,7 +193,6 @@ const CARDS_PER_SHEET = PRINT.PER_SHEET;
 /* ---------- the standalone document Chromium prints ---------- */
 function buildDocument(order) {
   const main = [
-    titleCard(order.date, order.venue, order.pax),
     ...order.dishes.map(dishCard),
   ];
 

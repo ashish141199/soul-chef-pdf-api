@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Soul Chef Dish Cards</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&family=Caveat:wght@500&family=Poppins:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap">
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- ==================== PRINT SIZE — EDIT HERE ====================
+       Every dimension on the page comes from this one block. Change a
+       number here and the card, the sheet, the preview scale, the page
+       note and the printed PDF all follow; nothing else needs touching.
+
+       The defaults are measured from EY.pdf's own vector coordinates: its
+       card rectangle is 1011.87 x 321.94pt, repeated identically on every
+       page = 14.054 x 4.471in (357.0 x 113.6mm), a 3.14:1 strip, on an A2
+       portrait sheet (420 x 594mm) holding 1 card across and 4 down.
+
+       All lengths are INCHES. Handy conversions:
+         A4 portrait  8.268 x 11.693   |  A4 landscape 11.693 x  8.268
+         A3 portrait 11.693 x 16.535   |  A3 landscape 16.535 x 11.693
+         A2 portrait 16.535 x 23.386   |  A2 landscape 23.386 x 16.535
+         mm -> in: divide by 25.4      |  pt -> in: divide by 72
+  -->
+  <script>
+    const PRINT = {
+      // --- the card (one printed name tag) ---
+      CARD_W: 14.272,     // card width,  in
+      CARD_H: 5.58,       // card height, in
+
+      // --- the sheet the cards are printed on ---
+      SHEET_W: 16.531,    // sheet width,  in
+      SHEET_H: 23.385,    // sheet height, in
+
+      // --- how the cards sit on the sheet ---
+      COLS: 1,             // cards across
+      ROWS: 4,             // cards down
+      GAP: 0.18,           // space between cards, in
+      // PAD_SIDE is exactly (SHEET_W - COLS*CARD_W - (COLS-1)*GAP) / 2, so the
+      // card is centred and the row fits to the thou. Top/bottom are trimmed
+      // because four 5.58in cards plus gaps need 23.21in of the sheet's 23.385in.
+      PAD_TOP: 0.2,       // sheet padding, in
+      PAD_SIDE: 1.1295,
+      PAD_BOTTOM: 0.15,
+
+      // Type inside a card is sized in points so it stays absolute against
+      // the card's inch dimensions. This is the card's root font-size: every
+      // pt value in the card markup is relative to a card this size, so if
+      // you change CARD_W/CARD_H, scale this by the same factor.
+      CARD_FONT_PT: 43,
+
+      SHEET_LABEL: 'A2 portrait',   // shown in the preview note
+    };
+    PRINT.PER_SHEET = PRINT.COLS * PRINT.ROWS;
+
+    /* Check the cards actually fit the sheet. A sheet that is too small does
+       not complain on its own — it just clips at the page edge, and the loss
+       only shows up on the printed sheet — so say so loudly instead. */
+    PRINT.fitWarnings = (() => {
+      const needW = PRINT.COLS * PRINT.CARD_W + (PRINT.COLS - 1) * PRINT.GAP
+                  + PRINT.PAD_SIDE * 2;
+      const needH = PRINT.ROWS * PRINT.CARD_H + (PRINT.ROWS - 1) * PRINT.GAP
+                  + PRINT.PAD_TOP + PRINT.PAD_BOTTOM;
+      // compared at thou precision: a sheet over by even a few thou clips a
+      // hairline off the card, so a looser tolerance would hide a real loss
+      const out = [];
+      if (needW - PRINT.SHEET_W > 0.0005) {
+        out.push(`${PRINT.COLS} card(s) across need ${needW.toFixed(3)}in but the sheet is ` +
+                 `${PRINT.SHEET_W}in wide — reduce COLS/CARD_W/PAD_SIDE or widen SHEET_W.`);
+      }
+      if (needH - PRINT.SHEET_H > 0.0005) {
+        out.push(`${PRINT.ROWS} card(s) down need ${needH.toFixed(3)}in but the sheet is ` +
+                 `${PRINT.SHEET_H}in tall — reduce ROWS/CARD_H/padding or lengthen SHEET_H. ` +
+                 `The footer band also needs a little of the slack.`);
+      }
+      out.forEach((m) => console.warn('PRINT geometry: ' + m));
+      return out;
+    })();
+  </script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+            sans: ['Jost', 'system-ui', 'sans-serif'],
+            script: ['Caveat', 'cursive'],
+            poppins: ['Poppins', 'system-ui', 'sans-serif'],
+            playfair: ['"Playfair Display"', 'Georgia', 'serif'],
+          },
+          colors: {
+            cream: '#F3EBDD',
+            card: '#FBF6EC',
+            gold: '#A98B4F',
+            ink: '#2F2A24',
+            leaf: '#7D9A5F',
+            veg: '#2E8B2E',
+            nonveg: '#C0392B',
+            rose: '#D08A8A',
+          },
+          /* the print geometry, taken from the PRINT block above so there is
+             one place to edit; these back w-card, h-card-h, w-sheet, h-sheet-h */
+          spacing: {
+            card: PRINT.CARD_W + 'in',
+            'card-h': PRINT.CARD_H + 'in',
+            sheet: PRINT.SHEET_W + 'in',
+            'sheet-h': PRINT.SHEET_H + 'in',
+          },
+        },
+      },
+    };
+  </script>
+  <style>
+    /* Only what Tailwind utilities cannot express lives here: pseudo-element
+       corner marks, the mask custom property, and the print rules. Everything
+       else is a utility class in the markup. */
+
+    /* the brush-stroke mask the course badge wears, as a custom property so
+       the badge keeps its own background colour and the label stays live text */
+    :root {
+      --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='28 23 444 87' preserveAspectRatio='none'%3E%3Cpath fill='%23000' d='M60 25 C45 25 35 33 35 42 C35 47 40 51 45 54 C38 57 30 62 30 70 C30 77 38 82 48 84 C40 88 35 93 35 98 C35 106 50 108 70 108 L430 108 C450 108 465 106 465 98 C465 93 460 88 452 84 C462 82 470 77 470 70 C470 62 462 57 455 54 C460 51 465 47 465 42 C465 33 455 25 440 25 Z'/%3E%3C/svg%3E");
+    }
+
+    /* The four chamfered corner diagonals. Two are pseudo-elements and two
+       are <i> children; a utility class cannot generate a pseudo-element's
+       content, so the geometry stays in CSS. Each diagonal spans the points
+       --m along the edges meeting at a corner, positioned by its own centre
+       then rotated about that centre. */
+    .card-frame { --w: 2pt; --m: 15pt; }
+    .card-frame::before,
+    .card-frame::after,
+    .card-frame > i {
+      content: '';
+      position: absolute;
+      width: calc(var(--m) * 1.414);
+      height: var(--w);
+      background: #A98B4F;
+    }
+    .card-frame::before { top: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, -50%) rotate(-45deg); }
+    .card-frame::after { top: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, -50%) rotate(45deg); }
+    .card-frame > i:first-child { bottom: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, 50%) rotate(45deg); }
+    .card-frame > i:last-child { bottom: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, 50%) rotate(-45deg); }
+    /* the title card's frame is a plain rectangle, with no corner diagonals */
+    .card-frame.is-plain::before,
+    .card-frame.is-plain::after,
+    .card-frame.is-plain > i { display: none; }
+
+    @media print {
+      .no-print { display: none !important; }
+      /* the page is sized to the sheet itself, so print matches the preview
+         exactly: one A2 portrait sheet, 1 card across, no reflow.
+         @page size is written by JS from the A2 portrait constants */
+      body { background: #fff !important; padding: 0 !important; margin: 0 !important; }
+      html, body { height: auto !important; min-height: 0 !important; }
+      #pageRow { display: block !important; padding: 0 !important; }
+      #previewWrap { margin: 0 !important; padding: 0 !important; max-width: none !important; width: auto !important; }
+      .sheet {
+        transform: none !important;
+        box-shadow: none !important;
+        /* the sheet is exactly one page tall, so anything that rounds a
+           fraction past its edge is clipped rather than spilling to page 2 */
+        overflow: hidden !important;
+      }
+      /* each sheet is its own page: the frame carries the break, and the last
+         one must not emit a trailing blank page */
+      .sheet-frame {
+        width: auto !important;
+        height: auto !important;
+        overflow: hidden !important;
+        break-inside: avoid; page-break-inside: avoid;
+      }
+      .sheet-frame + .sheet-frame { break-before: page; page-break-before: always; }
+      .sheet-frame:last-child { break-after: avoid; page-break-after: avoid; }
+      .dish-card { break-inside: avoid; page-break-inside: avoid; }
+      #cards { display: block !important; gap: 0 !important; }
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-100 py-4 font-sans text-slate-800 antialiased">
+
+  <div id="pageRow" class="w-full px-6 lg:flex lg:items-start lg:gap-8">
+
+    <div id="formCard" class="no-print overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-slate-200 lg:w-[15rem] lg:flex-none lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto">
+      <div class="h-1 bg-gold"></div>
+
+      <div class="border-b border-slate-200 px-3 py-2.5">
+        <h1 class="font-display text-base font-semibold leading-tight tracking-tight text-slate-900">Soul Chef Dish Cards</h1>
+        <p class="mt-1 text-[10px] leading-snug text-slate-600">
+          Paste the order message exactly as received, then press Generate. The menu, date, venue, guest count and veg/non-veg marks are read for you.
+        </p>
+      </div>
+
+      <form id="orderForm" class="px-3 py-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-1.5">
+          <label for="order" class="block text-[11px] font-semibold text-slate-900">
+            Order <span class="text-nonveg">*</span>
+          </label>
+          <p id="count" class="font-sans text-[10px] text-slate-500"></p>
+        </div>
+
+        <textarea id="order" name="order" rows="14" required
+          class="mt-1.5 w-full resize-y rounded-md border border-slate-300 bg-white px-2 py-1.5 font-mono text-[10px] leading-relaxed text-slate-800 placeholder:text-slate-400 focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/30"
+          placeholder="*Order 6: 6 oct 2026*&#10;&#10;Name: Aditya - 98209 82025&#10;&#10;Location: Sony Music Office, BKC&#10;&#10;No of pax: 5&#10;&#10;*Menu for the event:*&#10;&#10;*Welcome Drinks*&#10;&bull; Amritsari Shikanji&#10;..."></textarea>
+
+        <div class="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
+          <button type="submit" id="generateBtn"
+            class="inline-flex items-center gap-1.5 rounded-md bg-gold px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-ink/40 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+            <svg id="spinner" hidden class="h-3 w-3 shrink-0 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" opacity="0.3"/>
+              <path d="M12 2 a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+            <span id="generateLabel">Generate cards</span>
+          </button>
+          <button type="button" id="printBtn" hidden
+            class="rounded-md bg-gold px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-gold/40 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+            Open PDF
+          </button>
+        </div>
+
+        <p id="error" hidden class="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200"></p>
+      </form>
+    </div>
+
+    <!-- ===================== PREVIEW ===================== -->
+    <div id="previewWrap" hidden class="mt-10 px-4 lg:mt-0 lg:min-w-0 lg:flex-1">
+      <h2 class="no-print mb-0.5 text-center font-poppins text-[10px] font-semibold uppercase tracking-[0.2em] text-black">
+        Card preview
+      </h2>
+      <p id="sheetNote" class="no-print mb-2 text-center font-poppins text-[10px] text-black"></p>
+
+      <div id="cards" class="flex w-full flex-col items-center gap-8"></div>
+    </div>
+  </div>
+
+<script>
+/* ---------- the leaf flourish, reused on every card ---------- */
+const LEAF = `<svg viewBox="0 0 40 16" class="h-[15pt] w-[40pt]" aria-hidden="true">
+  <path d="M20 14 C20 8, 20 4, 20 2" stroke="#A98B4F" stroke-width="0.8" fill="none"/>
+  <path d="M20 11 C16 11, 13 9, 12 6 C16 6, 19 8, 20 11 Z" fill="#A98B4F" opacity="0.75"/>
+  <path d="M20 11 C24 11, 27 9, 28 6 C24 6, 21 8, 20 11 Z" fill="#A98B4F" opacity="0.75"/>
+  <path d="M20 7 C17 7, 15 5.5, 14 3 C17 3, 19 4.5, 20 7 Z" fill="#A98B4F" opacity="0.55"/>
+  <path d="M20 7 C23 7, 25 5.5, 26 3 C23 3, 21 4.5, 20 7 Z" fill="#A98B4F" opacity="0.55"/>
+</svg>`;
+
+const TOQUE = `<img src="assets/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
+  class="mx-auto h-[30pt] w-auto">`;
+
+/* the rule-and-sprig divider that closes each dish card */
+const BOTTOM_RULE = `<img src="assets/card bottom line.png" alt="" aria-hidden="true"
+  class="h-auto w-[230pt]">`;
+
+/* a smaller leaf sprig, used in the poster's footer corners */
+const CORNER_SPRIG = `<img src="assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[30pt] w-auto">`;
+
+/* foliage that fills a bottom corner and spills inward */
+const EDGE_SPRIG = `<img src="assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto">`;
+const EDGE_SPRIG_R = `<img src="assets/bottom_right_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto">`;
+
+/* small diamond ornament under the title card's tagline */
+const FLEURON = `<svg viewBox="0 0 40 10" class="mx-auto h-[8pt] w-[41pt]" aria-hidden="true">
+  <path d="M4 5 L16 5" stroke="#B49A63" stroke-width="0.5" opacity="0.8"/>
+  <path d="M24 5 L36 5" stroke="#B49A63" stroke-width="0.5" opacity="0.8"/>
+  <path d="M20 1 C20.6 3.6, 21.4 4.4, 24 5 C21.4 5.6, 20.6 6.4, 20 9 C19.4 6.4, 18.6 5.6, 16 5 C18.6 4.4, 19.4 3.6, 20 1 Z" fill="#B49A63"/>
+</svg>`;
+
+/* The sheet's own utilities, built from the PRINT block so the grid, the
+   padding and the gap all follow one set of numbers. Tailwind's CDN scans
+   the DOM for class names, and these are whole strings by the time they land
+   in the markup, so it sees them as written. */
+const SHEET_CLASS = [
+  'sheet box-border grid justify-center bg-cream origin-top-left',
+  'w-sheet h-sheet-h',
+  `gap-[${PRINT.GAP}in]`,
+  `p-[${PRINT.PAD_TOP}in_${PRINT.PAD_SIDE}in_${PRINT.PAD_BOTTOM}in]`,
+  `[grid-template-columns:repeat(${PRINT.COLS},${PRINT.CARD_W}in)]`,
+  // the card rows at their own height, then a final row that takes up the
+  // slack so the footer always sits on the sheet's bottom edge
+  `[grid-template-rows:repeat(${PRINT.ROWS},min-content)_1fr]`,
+  'scale-[var(--sheet-scale,1)]',
+].join(' ');
+
+/* the footer spans every column and sits in the slack row after the cards */
+const FOOTER_CLASS =
+  `sheet-footer col-[1/-1] row-[${PRINT.ROWS + 1}] self-end ` +
+  'flex items-end justify-center px-[6pt] pt-[4pt] pb-[2pt]';
+
+/* the decorative band across the bottom of the poster */
+function sheetFooter() {
+  // one piece of artwork: it already carries the end sprigs, both rules and
+  // the centre leaf, so it just spans the grid at the sheet's full width
+  // the band sits in the sheet's slack row, so its height is capped and the
+  // artwork is fitted inside: a w-full image would scale to its own aspect
+  // ratio and push the sheet past one page
+  return `<div class="${FOOTER_CLASS}">
+    <img src="assets/footer.png" alt="" aria-hidden="true"
+      class="block max-h-[48pt] w-full object-contain">
+  </div>`;
+}
+
+/* ---------- badge colour per course ---------- */
+const BADGE = {
+  'Welcome Drink': 'bg-leaf',
+  'Soup':          'bg-leaf',
+  'Starters':      'bg-[#D9A842]',
+  'Main Course':   'bg-leaf',
+  'Accompaniments':'bg-leaf',
+  'Desserts':      'bg-leaf',
+};
+
+/* ================= the parser: the model reads the order ===================
+   The order text is read by a model rather than by regexes, so wording the
+   rules never anticipated (an unlisted course heading, a dish whose diet is
+   a judgment call) is still read correctly.
+   The key lives server-side (server.js locally, the Vercel function in
+   production) and forwards this to OpenRouter, so the key is never in the
+   page and the request comes from a real origin.
+   API_BASE points at the deployed Vercel functions directly so this page
+   works wherever it is served from (local server.js, n8n, a static host) —
+   not only when it happens to share an origin with the functions. */
+const API_BASE = 'https://vercel-time-api-pi.vercel.app';
+const PARSE_URL = API_BASE + '/api/parse';
+const MODEL = 'openai/gpt-6-luna';
+
+const SYSTEM_PROMPT = `You extract catering order details from a free-form WhatsApp message and return JSON only.
+
+Rules:
+- dishes: every menu item, in menu order. Ignore non-menu lines (name, phone,
+  pax, location/venue, report/start time, and everything from "Note" onwards).
+- A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line
+  with no bullet: "Welcome Drinks", "Soup", "Starters on Buffet", "Main Course
+  on Buffet", "Accompaniments", "Deserts", "Desserts". Never emit a dish whose
+  name is just a heading. A heading that is followed by its items on later
+  lines still only sets the category, e.g.
+
+    Soup
+
+    Broccoli & Roasted Almond Soup with Garlic Stick
+
+  is ONE dish, "Broccoli & Roasted Almond Soup with Garlic Stick", in the
+  "Soup" category — not a dish called "Soup".
+- name: the dish name, Title Cased, with any parenthetical detail REMOVED and
+  any trailing serving phrase REMOVED (see sub). Keep "&" as written.
+- sub: the detail pulled off the name. Either
+    - a parenthetical: "(Focaccia & Garlic bread)" -> "Focaccia | Garlic Bread", or
+    - a serving phrase, which must be CUT from the name:
+      "Blueberry Panncotta Served in Shot Glass" -> name "Blueberry Panncotta",
+      sub "Served in Shot Glass".
+      "Chocolate mousse in shot glass" -> name "Chocolate Mousse",
+      sub "Served in Shot Glass".
+  Empty string when there is none.
+- category: which course the dish belongs to, as one of EXACTLY these labels:
+  "Welcome Drink", "Soup", "Starters", "Main Course", "Accompaniments", "Desserts".
+  Map the message's wording onto that list: "Welcome Drinks" -> "Welcome Drink",
+  "Starters on Buffet" -> "Starters", "Main Course on Buffet" -> "Main Course",
+  "Deserts" -> "Desserts". Items after a heading inherit it until the next heading.
+  If a dish fits none of them, use the closest one; never invent a new label.
+- diet: "N" ONLY when the dish NAME ITSELF names meat, fish, poultry or seafood.
+  Chicken, mutton, lamb, prawn, fish, crab, bacon and ham in the name are "N".
+  Everything else is "V". This is the single most important rule, so apply it
+  literally:
+    * A dish a restaurant MIGHT make with a hidden animal ingredient is still
+      "V" when its name does not say so. "Pad Thai Noodles" is "V", not "N" —
+      fish sauce is not in the name. Likewise "Caesar Salad" (anchovy),
+      "Kimchi Fried Rice" (shrimp paste), "Panna Cotta" (gelatin): all "V".
+      Record the doubt in dietConfidence, NEVER in diet.
+    * Read the whole menu before deciding. An all-vegetarian menu almost never
+      contains one hidden non-veg dish, so a borderline name on such a menu is
+      "V".
+    * EGG IS VEGETARIAN here, as it is on an Indian catering menu: egg in
+      pasta, ravioli, noodles, mayonnaise, cake or custard does NOT make a
+      dish "N". So "Pumpkin Ravioli with Sage Butter Cream Sauce" is "V".
+  Marking a vegetarian dish "N" is the worst error you can make: it puts a red
+  NON-VEG mark on a veg buffet table. When unsure, choose "V" and flag it.
+- dietConfidence: "high" when the dish name makes the diet obvious, "low" when
+  a hidden animal ingredient is plausible even though the name does not say so
+  (Caesar Salad may contain anchovy; a mousse or panna cotta may contain
+  gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or
+  shrimp paste). "low" is how you express doubt — the diet field stays "V".
+- eventDate: the date as written, e.g. "28 September 2026". Empty string if absent.
+- venue: the place, from a "Venue:" or "Location:" line. Shorten it for a card:
+  drop a leading floor number and turn "Birla Centurion-Worli" into
+  "Birla Centurion, Worli". If the line is only a URL (e.g. a Google Maps link)
+  with no readable place name, return an empty string.
+- pax: the guest count, from a line like "No. of pax:", "No of pax:" or "Pax:".
+  Keep any bracketed note, upper case, e.g. "38 pax (2 Jain)" -> "38 PAX · 2 JAIN",
+  and "32" -> "32 PAX". Empty string if absent.
+- reportTime: the crew's reporting time, from a "Report time:" line, upper case
+  and tidied, e.g. "10:00 am" -> "10:00 AM", "10 am" -> "10 AM". Empty string if absent.
+- startTime: the event start time, from a "Start time:" line, same formatting.
+  Empty string if absent.
+- eventName: a short label for the order, e.g. "Order 5". Empty string if absent.
+
+Return ONLY the JSON object. No prose, no code fences.`;
+
+const ORDER_SCHEMA = {
+  type: 'object',
+  properties: {
+    eventName: { type: 'string' },
+    eventDate: { type: 'string' },
+    venue: { type: 'string' },
+    pax: { type: 'string' },
+    reportTime: { type: 'string' },
+    startTime: { type: 'string' },
+    dishes: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          sub: { type: 'string' },
+          category: { type: 'string' },
+          diet: { type: 'string', enum: ['V', 'N'] },
+          dietConfidence: { type: 'string', enum: ['high', 'low'] },
+        },
+        required: ['name', 'sub', 'category', 'diet', 'dietConfidence'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['eventName', 'eventDate', 'venue', 'pax', 'reportTime', 'startTime', 'dishes'],
+  additionalProperties: false,
+};
+
+/* Ask the model to read the order. Returns the shape the renderer expects:
+   { date, venue, pax, reportTime, startTime,
+     dishes: [{ course, name, note, veg, unsure }] }. */
+async function parseOrder(text) {
+  const res = await fetch(PARSE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: MODEL,
+      temperature: 0,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: 'Extract the order details from this message:\n\n' + text },
+      ],
+      // the schema is enforced by the API, so the reply needs no repair
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'order', strict: true, schema: ORDER_SCHEMA },
+      },
+    }),
+  });
+
+  if (res.status === 404) {
+    throw new Error('No parser reachable at ' + API_BASE + ' — check the Vercel deployment is live.');
+  }
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error('Parsing failed (' + res.status + '). ' + detail.slice(0, 300));
+  }
+
+  const body = await res.json();
+  const content = body?.choices?.[0]?.message?.content;
+  if (!content) throw new Error('OpenRouter returned no content.');
+
+  let parsed;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new Error('Could not read the model\'s reply as JSON.');
+  }
+
+  return {
+    date: parsed.eventDate || '',
+    venue: parsed.venue || '',
+    pax: parsed.pax || '',
+    reportTime: parsed.reportTime || '',
+    startTime: parsed.startTime || '',
+    dishes: (parsed.dishes || [])
+      .filter((d) => d && d.name)
+      .map((d) => ({
+        course: d.category || 'Main Course',
+        name: d.name,
+        note: d.sub || '',
+        veg: d.diet !== 'N',
+        unsure: d.dietConfidence === 'low',
+      })),
+  };
+}
+
+/* ---------- card markup: every card is CARD_W x CARD_H from the PRINT block ---------- */
+function cardShell(inner, extra = '', frameClass = '') {
+  return `<div class="dish-card relative box-border flex w-card h-card-h flex-none flex-col items-center overflow-hidden bg-card px-[15pt] py-[15pt] text-[${PRINT.CARD_FONT_PT}pt] ${extra}">
+    <div class="card-frame ${frameClass} pointer-events-none absolute inset-[10pt] border-[2pt] border-solid border-gold"><i></i><i></i></div>
+    ${inner}
+  </div>`;
+}
+
+function brandMark() {
+  return `<div class="relative w-full pt-[2pt]">
+    ${TOQUE}
+    <p class="mt-[5pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[7pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
+      &mdash; Stress Free Experience For Your Event &mdash;
+    </p>
+  </div>`;
+}
+
+function titleCard(date, venue, pax) {
+  return cardShell(`
+    <div class="relative flex h-full w-full flex-col items-center justify-center text-center">
+      <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[2pt] right-[2pt]">${EDGE_SPRIG_R}</div>
+      <img src="assets/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true" class="mx-auto h-[36pt] w-auto">
+      <p class="mt-[5pt] font-display text-[40pt] font-semibold leading-none tracking-[0.12em] text-ink">SOUL CHEF</p>
+      <p class="mt-[7pt] font-sans text-[12pt] font-medium uppercase leading-none tracking-[0.1em] text-ink/75">
+        &mdash; Stress Free Experience For Your Event &mdash;
+      </p>
+      <div class="mt-[7pt]">${FLEURON.replace('h-[8pt] w-[41pt]', 'h-[13pt] w-[66pt]')}</div>
+      <p class="mt-[9pt] font-sans text-[24pt] font-medium leading-none tracking-[0.08em] text-ink">${(date || '').toUpperCase() || '&mdash;'}</p>
+      <p class="mt-[9pt] font-playfair text-[19pt] italic leading-tight text-ink/85">${venue || ''}</p>
+      ${pax ? `<p class="mt-[7pt] font-sans text-[15pt] font-medium uppercase leading-none tracking-[0.12em] text-gold">${pax}</p>` : ''}
+    </div>`, '', 'is-plain');
+}
+
+/* The starting size for every dish name. fitNames then measures the whole set
+   and steps them all down together until the longest fits, so the cards share
+   one size rather than each picking its own from a character count. This is
+   only the starting point and the size used if scripting never runs. */
+function nameSize() {
+  return 'text-[38pt]';
+}
+
+function dishCard(d) {
+  // Starters/Main Course badges flip to red for non-veg dishes; other courses keep a fixed colour.
+  const FLIPS_FOR_NONVEG = d.course === 'Starters' || d.course === 'Main Course';
+  const badge = (FLIPS_FOR_NONVEG && !d.veg) ? 'bg-nonveg' : (BADGE[d.course] || 'bg-leaf');
+  const dotColor = d.veg ? 'bg-veg' : 'bg-nonveg';
+  const dotBorder = d.veg ? 'border-veg' : 'border-nonveg';
+  const dotText = d.veg ? 'text-veg' : 'text-nonveg';
+  const dotLabel = d.veg ? 'VEG' : 'NON-VEG';
+  return cardShell(`
+    <!-- The brand mark, badge and name sit together as one centred group with
+         one fixed gap between them, while the rule and diet mark are pinned to
+         the card's bottom edge. Stretching all four to fill the height is what
+         left a hole between the course badge and the dish name. -->
+    <div class="relative flex h-full w-full flex-col items-center">
+      <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
+
+      <!-- the diet mark is the one thing a guest must read at a glance, so it
+           gets the FSSAI-style bordered square, pinned to the top-left corner -->
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
+        <span class="flex h-[20pt] w-[20pt] items-center justify-center border-[2pt] border-solid ${dotBorder}">
+          <span class="h-[11pt] w-[11pt] rounded-full ${dotColor}"></span>
+        </span>
+        <span class="font-sans text-[16pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
+      </div>
+
+      <div class="flex w-full flex-1 flex-col items-center justify-center gap-[16pt]">
+        ${brandMark()}
+
+        <div class="flex w-full justify-center">
+          <span class="ribbon w-[330pt] [-webkit-mask-image:var(--brush)] [mask-image:var(--brush)] [-webkit-mask-size:100%_100%] [mask-size:100%_100%] [-webkit-mask-repeat:no-repeat] [mask-repeat:no-repeat] ${badge} whitespace-nowrap px-[20pt] py-[11pt] text-center font-sans text-[17pt] font-semibold uppercase leading-none tracking-[0.14em] text-white">
+            ${d.course}
+          </span>
+        </div>
+
+        <div class="relative z-10 flex w-full flex-col items-center px-[26pt]">
+          <!-- h-[128pt] is the room between the course badge and the bottom
+               rule: about two lines at the shared size. fitNames measures the
+               inner span against it, so it decides how large the set can be -->
+          <!-- the sub-note belongs to the name, so it sits inside the same
+               centred box: outside it, the box's fixed height pushed the note
+               away from the name it describes -->
+          <div class="flex h-[128pt] w-full flex-col items-center justify-center overflow-hidden">
+            <h3 class="dish-name text-balance text-center font-playfair ${nameSize(d.name)} font-bold leading-[1.15] text-ink">
+              ${d.name}
+            </h3>
+            ${d.note ? `<p class="mt-[5pt] text-center font-display text-[19pt] italic leading-tight text-ink">${d.note}</p>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <div class="relative z-10 flex flex-col items-center">
+        ${BOTTOM_RULE}
+      </div>
+    </div>`);
+}
+
+/* ---------- wire it up ---------- */
+const form = document.getElementById('orderForm');
+const orderEl = document.getElementById('order');
+const cardsEl = document.getElementById('cards');
+const wrapEl = document.getElementById('previewWrap');
+const errEl = document.getElementById('error');
+const countEl = document.getElementById('count');
+const sheetNote = document.getElementById('sheetNote');
+const printBtn = document.getElementById('printBtn');
+const generateBtn = document.getElementById('generateBtn');
+const spinner = document.getElementById('spinner');
+const generateLabel = document.getElementById('generateLabel');
+
+/* the button doubles as the progress indicator, first while the order is
+   read and then while the server prints the PDF */
+function setBusy(on, label) {
+  spinner.hidden = !on;
+  generateBtn.disabled = on;
+  printBtn.disabled = on;
+  generateLabel.textContent = on ? (label || 'Generating…') : 'Generate cards';
+}
+
+/* Reading the order costs an API call, so it runs on submit rather than on
+   every keystroke. `busy` keeps a second submit from racing the first. */
+let busy = false;
+
+async function render(opts = {}) {
+  const text = orderEl.value;
+
+  if (!text.trim()) {
+    // an empty box is a blank slate, not a mistake
+    errEl.hidden = true;
+    wrapEl.hidden = true;
+    printBtn.hidden = true;
+    countEl.textContent = '';
+    sheetNote.textContent = '';
+    return;
+  }
+
+  if (busy) return;
+  busy = true;
+  errEl.hidden = true;
+  countEl.textContent = 'Reading the order…';
+  setBusy(true);
+
+  let data;
+  try {
+    data = await parseOrder(text);
+  } catch (err) {
+    errEl.hidden = false;
+    errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+    errEl.textContent = err.message;
+    countEl.textContent = '';
+    wrapEl.hidden = true;
+    printBtn.hidden = true;
+    busy = false;
+    setBusy(false);
+    return;
+  }
+  busy = false;
+  setBusy(false);
+
+  if (!data.dishes.length) {
+    errEl.hidden = false;
+    errEl.textContent = 'No dishes found in that message. Check it includes a menu with course headings.';
+    wrapEl.hidden = true;
+    printBtn.hidden = true;
+    countEl.textContent = '';
+    sheetNote.textContent = '';
+    return;
+  }
+
+  errEl.hidden = true;
+
+  // every card, in print order
+  const main = [
+    ...data.dishes.map(dishCard),
+  ];
+
+  // Cap each sheet to CARDS_PER_SHEET (4 cols x 4 rows) so a sheet always
+  // holds to one A4 landscape page; anything beyond that continues on the
+  // next sheet rather than stretching this one.
+  const sheets = [];
+  for (let i = 0; i < main.length; i += CARDS_PER_SHEET) {
+    sheets.push(main.slice(i, i + CARDS_PER_SHEET));
+  }
+
+  cardsEl.innerHTML = sheets.map((chunk) =>
+    `<div class="sheet-frame overflow-hidden"><div class="${SHEET_CLASS} shadow-md ring-1 ring-slate-300">${
+      chunk.join('') + sheetFooter()
+    }</div></div>`
+  ).join('');
+
+  wrapEl.hidden = false;
+  printBtn.hidden = false;
+
+  const n = data.dishes.length;
+  countEl.textContent = `${n} dish card${n === 1 ? '' : 's'}`;
+
+  // dishes the model was unsure about: worth an eye before printing, since a
+  // wrong veg/non-veg dot is the one mistake that matters on a buffet table
+  const review = data.dishes.filter((d) => d.unsure);
+  if (review.length) {
+    errEl.hidden = false;
+    errEl.className = 'mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800 ring-1 ring-amber-200';
+    errEl.textContent = 'Please double-check the veg/non-veg mark on: ' +
+      review.map((d) => d.name).join(', ');
+  } else {
+    errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+  }
+  // the sheets have just been rebuilt, so any PDF held from before is stale
+  if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = null; pdfKey = null; }
+
+  // a different card count means a different layout, so re-fit it
+  if (cardCount !== main.length) fitScale = null;
+  cardCount = main.length;   // the sheet note is written once the sheet is measured
+
+  // The Tailwind CDN generates classes by scanning the DOM, so the utilities
+  // on a sheet it has never seen are not in the stylesheet the instant
+  // innerHTML returns. Measuring then reads an unstyled box, so wait until
+  // the sheet reports its real width before fitting or printing.
+  await sheetsStyled();
+
+  // the names are measured against the real webfont, not the fallback, or a
+  // name that fits in Georgia but not Cormorant would slip through
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  fitNames();
+
+  updateSheetScale();
+  if (opts.scroll) wrapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (opts.pdf) openPdfTab();
+}
+
+/* Shrink any dish name that still does not fit its card.
+   nameSize picks one size for almost every dish so the names read as a set,
+   but character count only approximates how wide a name actually draws: a
+   name of wide letters can overflow where a narrower one of the same length
+   fits. So measure each one after layout and step it down until it fits,
+   which keeps every card at the shared size except the few that cannot be.
+   Run after the webfonts are ready, or the measurement is of a fallback. */
+function fitNames() {
+  const names = [...cardsEl.querySelectorAll('.dish-name')];
+  if (!names.length) return;
+
+  // A name is allowed to wrap: demanding one line would size the whole set to
+  // whatever the longest dish needs, which is tiny. Only running past the
+  // fixed box around it — the room between the course badge and the bottom
+  // rule — counts as not fitting.
+  const fits = (el) => {
+    const box = el.parentElement;
+    return el.offsetHeight <= box.clientHeight + 1 &&
+           el.offsetWidth <= box.clientWidth + 1;
+  };
+
+  // Start every name at the same size and step the whole set down together
+  // until the longest one fits. One size for all of them is the point: a card
+  // that sized itself independently would read as a different card.
+  const START_PX = 38 * (96 / 72);   // 38pt
+  let px = START_PX;
+  names.forEach((el) => { el.style.fontSize = px + 'px'; });
+
+  for (let i = 0; i < 20; i++) {
+    if (names.every(fits)) break;
+    px *= 0.94;
+    names.forEach((el) => { el.style.fontSize = px + 'px'; });
+  }
+
+  // One freakishly long name would otherwise drag every card down with it, so
+  // below this floor it alone keeps shrinking and the rest hold the set size.
+  const FLOOR_PX = 22 * (96 / 72);
+  if (px < FLOOR_PX) {
+    names.forEach((el) => { el.style.fontSize = FLOOR_PX + 'px'; });
+    names.filter((el) => !fits(el)).forEach((el) => {
+      let own = FLOOR_PX;
+      for (let i = 0; i < 12 && !fits(el); i++) {
+        own *= 0.92;
+        el.style.fontSize = own + 'px';
+      }
+    });
+  }
+}
+
+/* Resolve once the CDN has applied the sheet's utilities, i.e. the sheet
+   measures its true width. Falls back after ~2s so a layout that never
+   matches still renders rather than hanging. */
+function sheetsStyled() {
+  const sheet = cardsEl.querySelector('.sheet');
+  if (!sheet) return Promise.resolve();
+  const targetPx = Math.round(SHEET_W_IN * PX_PER_IN);
+  return new Promise((resolve) => {
+    const deadline = performance.now() + 2000;
+    (function poll() {
+      if (Math.abs(sheet.offsetWidth - targetPx) <= 2 || performance.now() > deadline) {
+        return resolve();
+      }
+      requestAnimationFrame(poll);
+    })();
+  });
+}
+
+/* ---------- the sheets, rendered to a real PDF by the server ----------
+   The browser cannot write a PDF file without putting its print dialog in
+   front of the user, so the page hands the finished markup to /api/pdf,
+   where headless Chromium prints it. What comes back is an actual PDF, which
+   opens in the browser's own viewer with no dialog in the way. */
+
+/* the exact document the server should print: this page's head (fonts,
+   Tailwind config and the stylesheet) over the sheets at their true size */
+function printableDocument() {
+  const head = [...document.head.querySelectorAll('link, script, style')]
+    .map((el) => el.outerHTML).join('\n');
+
+  // outerHTML carries the inline font-size fitNames wrote, so the PDF prints
+  // the names at the size that was measured here rather than re-fitting them
+  // in a browser that may lay the text out a hair differently
+  const sheets = [...cardsEl.querySelectorAll('.sheet')]
+    .map((el) => `<div class="sheet-frame">${el.outerHTML}</div>`).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Soul Chef Dish Cards</title>
+<base href="${location.origin}/">
+${head}
+<style>
+  @page { size: ${SHEET_W_IN.toFixed(2)}in ${SHEET_H_IN.toFixed(2)}in; margin: 0; }
+  body { margin: 0; background: #fff; }
+  #cards { display: block; }
+  .sheet-frame {
+    width: auto !important; height: auto !important; overflow: hidden !important;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .sheet-frame + .sheet-frame { break-before: page; page-break-before: always; }
+  .sheet-frame:last-child { break-after: avoid; page-break-after: avoid; }
+  .sheet {
+    transform: none !important; box-shadow: none !important; margin: 0 !important;
+    overflow: hidden !important;
+  }
+  .dish-card { break-inside: avoid; page-break-inside: avoid; }
+</style>
+</head><body><div id="cards">${sheets}</div></body></html>`;
+}
+
+let pdfUrl = null;    // the last PDF, revoked before a new one replaces it
+let pdfKey = null;    // the markup that PDF was made from, so a repeat click is free
+
+/* what the placeholder tab shows while the PDF is still being made, so the
+   tab is never a blank white page the user wonders about */
+const PDF_WAITING_DOC =
+  '<!doctype html><title>Soul Chef Dish Cards</title>' +
+  '<body style="margin:0;display:grid;place-items:center;height:100vh;' +
+  'font:14px system-ui,sans-serif;color:#2F2A24;background:#FBF6EC">' +
+  '<p>Making the PDF…</p>';
+
+async function openPdfTab() {
+  const html = printableDocument();
+
+  // Open the tab FIRST, inside the click, for two reasons: the tab appears at
+  // once instead of after the render, and window.open survives the popup
+  // blocker here, which it would not after an await.
+  const tab = window.open('', '_blank');
+  if (tab) {
+    try { tab.document.write(PDF_WAITING_DOC); tab.document.close(); } catch {}
+  }
+
+  // the same sheets print to the same PDF, so a second click reuses it
+  if (pdfUrl && pdfKey === html) {
+    if (tab) tab.location.replace(pdfUrl);
+    return;
+  }
+
+  setBusy(true, 'Making the PDF…');
+  try {
+    const res = await fetch(API_BASE + '/api/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(detail.slice(0, 300) || ('The server could not make the PDF (' + res.status + ').'));
+    }
+
+    // a blob URL, so the tab shows the PDF itself rather than re-posting
+    if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+    pdfUrl = URL.createObjectURL(await res.blob());
+    pdfKey = html;
+
+    if (tab) {
+      // replace, not assign, so the placeholder leaves no history entry
+      tab.location.replace(pdfUrl);
+    } else {
+      errEl.hidden = false;
+      errEl.className = 'mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800 ring-1 ring-amber-200';
+      errEl.textContent = 'Allow pop-ups for this site to open the PDF in a new tab, then press Open PDF.';
+    }
+  } catch (err) {
+    // the placeholder tab would sit on "Making the PDF…" forever, so say what
+    // went wrong there too rather than only in the sidebar
+    if (tab) {
+      try {
+        tab.document.body.textContent = err.message;
+      } catch {}
+    }
+    errEl.hidden = false;
+    errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+    errEl.textContent = err.message;
+  } finally {
+    setBusy(false);
+  }
+}
+
+/* ---------- the printed page is sized to the poster, so print == preview ---------- */
+const printPageStyle = document.createElement('style');
+document.head.appendChild(printPageStyle);
+function setPrintPageSize(wIn, hIn) {
+  printPageStyle.textContent =
+    `@media print { @page { size: ${wIn.toFixed(2)}in ${hIn.toFixed(2)}in; margin: 0; } }`;
+}
+
+/* ---------- fit the poster sheet to the preview column's real width ---------- */
+const PX_PER_IN = 96;      // CSS reference pixel: 1in = 96px
+// all of these come from the PRINT block at the top of the file
+const SHEET_W_IN = PRINT.SHEET_W, SHEET_H_IN = PRINT.SHEET_H;
+const CARD_W_IN = PRINT.CARD_W, CARD_H_IN = PRINT.CARD_H;
+const CM_PER_IN = 2.54;
+const SHEET_COLS = PRINT.COLS, SHEET_ROWS = PRINT.ROWS;
+const CARDS_PER_SHEET = PRINT.PER_SHEET;
+let cardCount = 0;
+let fitScale = null;   // set on first layout; reset when the card count changes
+function updateSheetScale() {
+  if (wrapEl.hidden) return;
+  // measure wrapEl, not cardsEl: cardsEl is a flex container that hugs its
+  // (scale-dependent) children, which would make this circular.
+  // measure the real space from the preview column's left edge to the window
+  // edge: the column is a flex item, so its own width can lag the layout
+  const wrapBox = wrapEl.getBoundingClientRect();
+  const style = getComputedStyle(wrapEl);
+  const padL = parseFloat(style.paddingLeft), padR = parseFloat(style.paddingRight);
+  const PAGE_PAD_R = 24;   // #pageRow's px-6
+  const available = document.documentElement.clientWidth - wrapBox.left - padL - padR - PAGE_PAD_R;
+  if (!available) return;
+  const sheetWidthPx = SHEET_W_IN * PX_PER_IN;
+  // a small gutter keeps the sheet off the column edges
+  const GUTTER_PX = 12;
+  const widthScale = (available - GUTTER_PX) / sheetWidthPx;
+
+  const sheetEls = cardsEl.querySelectorAll('.sheet');
+  if (!sheetEls.length) return;
+  // the sheet is a fixed box set by PRINT, so its height is known up front
+  const sheetHeightIn = SHEET_H_IN;
+
+  // Fit to the available WIDTH only, and let the page scroll vertically.
+  // Fitting the height too kept the sheet small, since a tall poster nearly
+  // fills the viewport before it has a chance to use the width.
+  // Set on the first layout, then held: browser zoom shrinks innerWidth in CSS
+  // px, so recomputing on every zoom would cancel the zoom out.
+  if (fitScale === null) fitScale = widthScale * 0.95;
+  const scale = fitScale;
+  cardsEl.style.setProperty('--sheet-scale', scale.toFixed(4));
+
+  // make the printed page exactly the sheet's size, so print == preview
+  setPrintPageSize(SHEET_W_IN, sheetHeightIn);
+
+  const cm = (inches) => (inches * CM_PER_IN).toFixed(1);
+  const sheetCount = sheetEls.length;
+  sheetNote.innerHTML =
+    `${cardCount} cards &middot; ` +
+    `${sheetCount} ${PRINT.SHEET_LABEL} sheet${sheetCount === 1 ? '' : 's'} &middot; ` +
+    `card ${CARD_W_IN}in &times; ${CARD_H_IN}in (${cm(CARD_W_IN)} &times; ${cm(CARD_H_IN)} cm) &middot; ` +
+    `sheet ${SHEET_W_IN}in &times; ${sheetHeightIn.toFixed(2)}in ` +
+    `(${cm(SHEET_W_IN)} &times; ${cm(sheetHeightIn)} cm)` +
+    // a sheet too small for its cards clips silently, so say so on the page
+    (PRINT.fitWarnings.length
+      ? `<br><span class="text-nonveg font-semibold">${PRINT.fitWarnings.join(' ')}</span>`
+      : '');
+
+  // size each frame to its scaled sheet
+  cardsEl.querySelectorAll('.sheet-frame').forEach((frame) => {
+    const s = frame.querySelector('.sheet');
+    if (!s) return;
+    frame.style.width = (s.offsetWidth * scale) + 'px';
+    frame.style.height = (s.offsetHeight * scale) + 'px';
+  });
+}
+
+window.addEventListener('resize', () => updateSheetScale());
+
+// Webfonts and the artwork both change the sheet's size after first paint, so
+// discard the cached fit and measure again once they have settled — otherwise
+// the first (wrong) measurement is held forever.
+function refit() { fitScale = null; updateSheetScale(); }
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit);
+window.addEventListener('load', refit);
+
+// Reading the order is an API call, so it happens on submit — not on every
+// keystroke. Editing the text clears the stale preview so what is on screen
+// always matches what was last read.
+orderEl.addEventListener('input', () => {
+  if (wrapEl.hidden) return;
+  wrapEl.hidden = true;
+  printBtn.hidden = true;
+  countEl.textContent = '';
+  sheetNote.textContent = '';
+});
+
+form.addEventListener('submit', (e) => { e.preventDefault(); render({ scroll: true }); });
+
+// the preview is already on screen by now, so this just prints it
+printBtn.addEventListener('click', openPdfTab);
+</script>
+</body>
+</html>
