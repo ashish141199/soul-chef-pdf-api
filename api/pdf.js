@@ -300,44 +300,48 @@ const FIT_NAMES_SCRIPT = `
   })();
 `;
 
-async function renderPdf(order) {
-  const html = buildDocument(order);
+/* Vercel keeps a warm container alive between invocations, so the browser is
+   cached at module scope rather than relaunched per request — launching
+   Chromium is several seconds, and it dominates an otherwise sub-second
+   render. A crashed browser would poison the cache, so the handle is dropped
+   whenever it disconnects and the next call relaunches. */
+let browserPromise = null;
 
-  const browser = await puppeteer.launch({
+async function getBrowser() {
+  if (browserPromise) {
+    const cached = await browserPromise.catch(() => null);
+    if (cached?.connected) return cached;
+    browserPromise = null;
+  }
+
+  browserPromise = puppeteer.launch({
     args: chromium.args,
     executablePath: await chromium.executablePath(),
     headless: chromium.headless,
   });
 
+  const browser = await browserPromise;
+  browser.once('disconnected', () => { browserPromise = null; });
+  return browser;
+}
+
+async function withPage(fn) {
+  const browser = await getBrowser();
+  const page = await browser.newPage();
   try {
-    const page = await browser.newPage();
-    page.on('requestfailed', (r) => console.error('[renderPdf] request failed:', r.url(), r.failure()?.errorText));
-    page.on('console', (msg) => console.log('[renderPdf] page console:', msg.type(), msg.text()));
+    return await fn(page);
+  } finally {
+    await page.close().catch(() => {});
+  }
+}
 
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 50000 });
+async function renderPdf(order) {
+  const html = buildDocument(order);
 
-    // Tailwind's CDN build scans the DOM and injects classes asynchronously,
-    // so the sheet can still be unstyled right after setContent.
-    await page.waitForFunction(() => {
-      const s = document.querySelector('.sheet');
-      return !s || s.offsetWidth > 500;
-    }, { timeout: 15000 }).catch(() => {});
-
-    await page.waitForFunction(() => {
-      return [...document.images].every((img) => img.complete);
-    }, { timeout: 15000 }).catch(() => {});
-
-    const imageReport = await page.evaluate(() => (
-      [...document.images].map((img) => ({
-        src: img.src,
-        complete: img.complete,
-        naturalWidth: img.naturalWidth,
-        naturalHeight: img.naturalHeight,
-      }))
-    ));
-    console.table(imageReport);
-    const broken = imageReport.filter((i) => i.naturalWidth === 0);
-    if (broken.length) console.error('[renderPdf] broken images:', broken.map((i) => i.src));
+  return withPage(async (page) => {
+    // networkidle0 already waits for the fonts, stylesheet and every asset
+    // image, so no further polling for them is needed.
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 50000 });
 
     await page.evaluateHandle('document.fonts.ready');
 
@@ -348,9 +352,7 @@ async function renderPdf(order) {
       printBackground: true,
       preferCSSPageSize: true,
     });
-  } finally {
-    await browser.close();
-  }
+  });
 }
 
 export default async function handler(req, res) {
@@ -395,39 +397,9 @@ export default async function handler(req, res) {
 /* kept for index.html's existing flow, which still posts fully-built HTML
    (it already has the real DOM to run fitNames against before serializing) */
 async function renderPdfFromHtml(html) {
-  const browser = await puppeteer.launch({
-    args: chromium.args,
-    executablePath: await chromium.executablePath(),
-    headless: chromium.headless,
-  });
-
-  try {
-    const page = await browser.newPage();
-    page.on('requestfailed', (r) => console.error('[renderPdfFromHtml] request failed:', r.url(), r.failure()?.errorText));
-    page.on('console', (msg) => console.log('[renderPdfFromHtml] page console:', msg.type(), msg.text()));
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 50000 });
-    await page.waitForFunction(() => {
-      const s = document.querySelector('.sheet');
-      return !s || s.offsetWidth > 500;
-    }, { timeout: 15000 }).catch(() => {});
-    await page.waitForFunction(() => {
-      return [...document.images].every((img) => img.complete);
-    }, { timeout: 15000 }).catch(() => {});
-    const imageReport = await page.evaluate(() => (
-      [...document.images].map((img) => ({
-        src: img.src,
-        complete: img.complete,
-        naturalWidth: img.naturalWidth,
-        naturalHeight: img.naturalHeight,
-      }))
-    ));
-    console.table(imageReport);
-    const broken = imageReport.filter((i) => i.naturalWidth === 0);
-    if (broken.length) console.error('[renderPdfFromHtml] broken images:', broken.map((i) => i.src));
-
+  return withPage(async (page) => {
+    await page.setContent(html, { waitUntil: 'networkidle0', timeout: 50000 });
     await page.evaluateHandle('document.fonts.ready');
     return await page.pdf({ printBackground: true, preferCSSPageSize: true });
-  } finally {
-    await browser.close();
-  }
+  });
 }
