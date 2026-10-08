@@ -6,7 +6,7 @@ A serverless PDF generation API that renders beautifully designed dish cards for
 
 This API endpoint (`POST /api/pdf`) takes parsed order data and generates a professional PDF containing dish cards. It's designed to work seamlessly with the Soul Chef event management system and supports integration with n8n workflows and browser-based clients.
 
-## Features
+## Features 
 
 - **PDF Generation**: Renders high-quality PDFs with Chromium/Puppeteer
 - **Print-Ready Output**: Optimized for A2 paper with 2×4 card layout per sheet
