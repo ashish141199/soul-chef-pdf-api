@@ -22,7 +22,7 @@ This API endpoint (`POST /api/pdf`) takes parsed order data and generates a prof
 - **Headless Browser**: [@sparticuz/chromium](https://www.npmjs.com/package/@sparticuz/chromium)
 - **Styling**: Tailwind CSS (CDN)
 - **Fonts**: Google Fonts (Cormorant Garamond, Jost, Playfair Display, Poppins, Caveat)
-- **Deployment**: Vercel (serverless)
+- **Deployment**: Vercel (serverless) 
 
 ## Installation
 
