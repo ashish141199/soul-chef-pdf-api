@@ -1,0 +1,3 @@
+# holds the OpenRouter key in plaintext
+.env
+node_modules/

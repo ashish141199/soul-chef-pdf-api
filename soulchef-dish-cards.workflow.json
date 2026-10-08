@@ -1,0 +1,215 @@
+{
+  "name": "Soul Chef - Dish Cards",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Soul Chef Dish Cards",
+        "formDescription": "Paste the order message exactly as received. The menu, event date and venue are read automatically.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Order",
+              "fieldType": "textarea",
+              "placeholder": "Order 5: 28 September 2026\n\nName: ...\n\nVenue: ...\n\nMenu for the event:\n\nWelcome Drinks\n• Guava Lime cooler\n...",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "customCss": ":root { --container-width: 95%; --font-size-input: 15px; --padding-card: 32px; }\n.container { max-width: 1100px; }\ntextarea { min-height: 50vh; }"
+        }
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000001",
+      "name": "On form submission",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "5c3b7e2a-6d1f-4c8e-9a47-3b1e8f2c6d10"
+    },
+    {
+      "parameters": {
+        "jsCode": "// The AI chain returns its JSON under .output when a structured parser is used.\nconst parsed = $json.output || $json;\nconst dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// api/pdf.js on Vercel builds the card HTML itself from this parsed order\n// JSON — the same shape OpenRouter returns — and renders it with Puppeteer.\n// This keeps one source of truth for the card markup (index.html's own\n// browser flow posts the same shape under { order: ... }).\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards' } }];"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000002",
+      "name": "Build replacements",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://vercel-time-api-pi.vercel.app/api/pdf",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ order: $('Build replacements').item.json.order }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000004",
+      "name": "Render PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "returnBinary",
+        "completionTitle": "Your dish cards are ready",
+        "completionMessage": "={{ 'The PDF is downloading. The sheet is A2 portrait, 16.531 x 23.385 in (42.0 x 59.4 cm); print at 100% on A2. Each card is 14.272 x 5.58 in (36.2 x 14.2 cm), 4 to a sheet - cut along the card edges.' + ($('Build replacements').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Build replacements').item.json.review.join(', ') : '') }}",
+        "inputDataFieldName": "data",
+        "options": {
+          "customCss": ":root { --container-width: 95%; --padding-card: 32px; }\n.container { max-width: 1100px; }"
+        }
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000006",
+      "name": "Return PDF",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        0
+      ],
+      "webhookId": "7d2e9f4b-1a3c-4b6d-8e5f-9a0c2e4b6f81"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Extract the order details from this message:\n\n{{ $json.Order }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You extract catering order details from a free-form WhatsApp message and return JSON only.\n\nRules:\n- dishes: every menu item, in menu order. Ignore non-menu lines (name, phone,\n  pax, location/venue, report/start time, and everything from \"Note\" onwards).\n- A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line\n  with no bullet: \"Welcome Drinks\", \"Soup\", \"Starters on Buffet\", \"Main Course\n  on Buffet\", \"Accompaniments\", \"Deserts\", \"Desserts\". Never emit a dish whose\n  name is just a heading. A heading that is followed by its items on later\n  lines still only sets the category, e.g.\n\n    Soup\n\n    Broccoli & Roasted Almond Soup with Garlic Stick\n\n  is ONE dish, \"Broccoli & Roasted Almond Soup with Garlic Stick\", in the\n  \"Soup\" category — not a dish called \"Soup\".\n- name: the dish name, Title Cased, with any parenthetical detail REMOVED and\n  any trailing serving phrase REMOVED (see sub). Keep \"&\" as written.\n- sub: the detail pulled off the name. Either\n    - a parenthetical: \"(Focaccia & Garlic bread)\" -> \"Focaccia | Garlic Bread\", or\n    - a serving phrase, which must be CUT from the name:\n      \"Blueberry Panncotta Served in Shot Glass\" -> name \"Blueberry Panncotta\",\n      sub \"Served in Shot Glass\".\n      \"Chocolate mousse in shot glass\" -> name \"Chocolate Mousse\",\n      sub \"Served in Shot Glass\".\n  Empty string when there is none.\n- category: which course the dish belongs to, as one of EXACTLY these labels:\n  \"Welcome Drink\", \"Soup\", \"Starters\", \"Main Course\", \"Accompaniments\", \"Desserts\".\n  Map the message's wording onto that list: \"Welcome Drinks\" -> \"Welcome Drink\",\n  \"Starters on Buffet\" -> \"Starters\", \"Main Course on Buffet\" -> \"Main Course\",\n  \"Deserts\" -> \"Desserts\". Items after a heading inherit it until the next heading.\n  If a dish fits none of them, use the closest one; never invent a new label.\n- diet: \"N\" ONLY when the dish NAME ITSELF names meat, fish, poultry or seafood.\n  Chicken, mutton, lamb, prawn, fish, crab, bacon and ham in the name are \"N\".\n  Everything else is \"V\". This is the single most important rule, so apply it\n  literally:\n    * A dish a restaurant MIGHT make with a hidden animal ingredient is still\n      \"V\" when its name does not say so. \"Pad Thai Noodles\" is \"V\", not \"N\" —\n      fish sauce is not in the name. Likewise \"Caesar Salad\" (anchovy),\n      \"Kimchi Fried Rice\" (shrimp paste), \"Panna Cotta\" (gelatin): all \"V\".\n      Record the doubt in dietConfidence, NEVER in diet.\n    * Read the whole menu before deciding. An all-vegetarian menu almost never\n      contains one hidden non-veg dish, so a borderline name on such a menu is\n      \"V\".\n    * EGG IS VEGETARIAN here, as it is on an Indian catering menu: egg in\n      pasta, ravioli, noodles, mayonnaise, cake or custard does NOT make a\n      dish \"N\". So \"Pumpkin Ravioli with Sage Butter Cream Sauce\" is \"V\".\n  Marking a vegetarian dish \"N\" is the worst error you can make: it puts a red\n  NON-VEG mark on a veg buffet table. When unsure, choose \"V\" and flag it.\n- dietConfidence: \"high\" when the dish name makes the diet obvious, \"low\" when\n  a hidden animal ingredient is plausible even though the name does not say so\n  (Caesar Salad may contain anchovy; a mousse or panna cotta may contain\n  gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or\n  shrimp paste). \"low\" is how you express doubt — the diet field stays \"V\".\n- eventDate: the date as written, e.g. \"28 September 2026\". Empty string if absent.\n- venue: the place, from a \"Venue:\" or \"Location:\" line. Shorten it for a card:\n  drop a leading floor number and turn \"Birla Centurion-Worli\" into\n  \"Birla Centurion, Worli\". If the line is only a URL (e.g. a Google Maps link)\n  with no readable place name, return an empty string.\n- pax: the guest count, from a line like \"No. of pax:\", \"No of pax:\" or \"Pax:\".\n  Keep any bracketed note, upper case, e.g. \"38 pax (2 Jain)\" -> \"38 PAX · 2 JAIN\",\n  and \"32\" -> \"32 PAX\". Empty string if absent.\n- reportTime: the crew's reporting time, from a \"Report time:\" line, upper case\n  and tidied, e.g. \"10:00 am\" -> \"10:00 AM\", \"10 am\" -> \"10 AM\". Empty string if absent.\n- startTime: the event start time, from a \"Start time:\" line, same formatting.\n  Empty string if absent.\n- eventName: a short label for the order, e.g. \"Order 5\". Empty string if absent.\n\nReturn ONLY the JSON object. No prose, no code fences."
+            }
+          ]
+        },
+        "hasOutputParser": true
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000020",
+      "name": "Parse order",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": "openai/gpt-6-luna",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000021",
+      "name": "OpenRouter Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        180,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"eventName\": {\n      \"type\": \"string\"\n    },\n    \"eventDate\": {\n      \"type\": \"string\"\n    },\n    \"venue\": {\n      \"type\": \"string\"\n    },\n    \"pax\": {\n      \"type\": \"string\"\n    },\n    \"reportTime\": {\n      \"type\": \"string\"\n    },\n    \"startTime\": {\n      \"type\": \"string\"\n    },\n    \"dishes\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"sub\": {\n            \"type\": \"string\"\n          },\n          \"category\": {\n            \"type\": \"string\"\n          },\n          \"diet\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"V\",\n              \"N\"\n            ]\n          },\n          \"dietConfidence\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"high\",\n              \"low\"\n            ]\n          }\n        },\n        \"required\": [\n          \"name\",\n          \"sub\",\n          \"category\",\n          \"diet\",\n          \"dietConfidence\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"eventName\",\n    \"eventDate\",\n    \"venue\",\n    \"pax\",\n    \"reportTime\",\n    \"startTime\",\n    \"dishes\"\n  ]\n}"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000022",
+      "name": "Order schema",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        340,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "On form submission": {
+      "main": [
+        [
+          {
+            "node": "Parse order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build replacements": {
+      "main": [
+        [
+          {
+            "node": "Render PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render PDF": {
+      "main": [
+        [
+          {
+            "node": "Return PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse order": {
+      "main": [
+        [
+          {
+            "node": "Build replacements",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Parse order",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Order schema": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Parse order",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
