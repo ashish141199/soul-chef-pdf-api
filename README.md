@@ -9,7 +9,7 @@ This API endpoint (`POST /api/pdf`) takes parsed order data and generates a prof
 ## Features 
 
 - **PDF Generation**: Renders high-quality PDFs with Chromium/Puppeteer
-- **Print-Ready Output**: Optimized for A2 paper with 2×4 card layout per sheet
+- **Print-Ready Output**: Optimized for A2 paper with 2×4 card layout per sheet 
 - **Flexible Input**: Accepts parsed order data from OpenRouter or pre-built HTML
 - **Real-time Styling**: Uses Tailwind CSS for responsive, elegant card designs
 - **Image Handling**: Seamlessly integrates custom assets (chef hats, decorative elements, footers)
