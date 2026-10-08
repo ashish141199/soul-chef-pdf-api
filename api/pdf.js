@@ -30,21 +30,26 @@ const ASSET_BASE = 'https://soulchef-pdf-api.vercel.app/assets';
 
 /* ==================== PRINT SIZE — keep in step with index.html ====================
    All lengths are INCHES. See index.html's own PRINT block for the full
-   explanation of these numbers (A2 portrait, 1 card across, 4 down). */
+   explanation of these numbers (A2 portrait, 2 cards across, 4 down). */
 const PRINT = {
-  CARD_W: 14.272,
+  CARD_W: 7.93,
   CARD_H: 5.58,
   SHEET_W: 16.531,
   SHEET_H: 23.385,
-  COLS: 1,
+  COLS: 2,
   ROWS: 4,
   GAP: 0.18,
   PAD_TOP: 0.2,
-  PAD_SIDE: 1.1295,
+  PAD_SIDE: 0.2455,
   PAD_BOTTOM: 0.15,
   CARD_FONT_PT: 43,
 };
 PRINT.PER_SHEET = PRINT.COLS * PRINT.ROWS;
+
+// the one shared gap between the toque, title, tagline, course badge and
+// dish name in a dish card's header stack — kept in step with index.html's
+// own GAP_FOR_ELEMENTS
+const GAP_FOR_ELEMENTS = 20; // pt
 
 /* ---------- reused artwork/ornament snippets, ported from index.html ---------- */
 const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
@@ -55,8 +60,8 @@ const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-h
 
 const EDGE_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
-const EDGE_SPRIG_R = `<img src="${ASSET_BASE}/bottom_right_leaf-removebg-preview.png" alt="" aria-hidden="true"
-  class="h-[78pt] w-auto">`;
+const EDGE_SPRIG_R = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto [transform:scaleX(-1)]">`;
 
 const FLEURON = `<svg viewBox="0 0 40 10" class="mx-auto h-[8pt] w-[41pt]" aria-hidden="true">
   <path d="M4 5 L16 5" stroke="#B49A63" stroke-width="0.5" opacity="0.8"/>
@@ -103,8 +108,8 @@ function cardShell(inner, extra = '', frameClass = '') {
 function brandMark() {
   return `<div class="relative w-full pt-[2pt]">
     ${TOQUE}
-    <p class="mt-[5pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
-    <p class="mt-[7pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
+    <p class="mt-[${GAP_FOR_ELEMENTS}pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[${GAP_FOR_ELEMENTS}pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
       &mdash; Stress Free Experience For Your Event &mdash;
     </p>
   </div>`;
@@ -113,8 +118,8 @@ function brandMark() {
 function titleCard(date, venue, pax) {
   return cardShell(`
     <div class="relative flex h-full w-full flex-col items-center justify-center text-center">
-      <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
-      <div class="pointer-events-none absolute bottom-[2pt] right-[2pt]">${EDGE_SPRIG_R}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]">${EDGE_SPRIG_R}</div>
       <img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true" class="mx-auto h-[36pt] w-auto">
       <p class="mt-[5pt] font-display text-[40pt] font-semibold leading-none tracking-[0.12em] text-ink">SOUL CHEF</p>
       <p class="mt-[7pt] font-sans text-[12pt] font-medium uppercase leading-none tracking-[0.1em] text-ink/75">
@@ -136,26 +141,27 @@ function dishCard(d) {
   const dotLabel = d.veg ? 'VEG' : 'NON-VEG';
   return cardShell(`
     <div class="relative flex h-full w-full flex-col items-center">
-      <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]">${EDGE_SPRIG_R}</div>
 
-      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[10pt]">
-        <span class="flex h-[26pt] w-[26pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
+        <span class="flex h-[25pt] w-[25pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
           <span class="h-[15pt] w-[15pt] rounded-full ${dotColor}"></span>
         </span>
-        <span class="font-sans text-[20pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
+        <span class="font-sans text-[19pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
       </div>
 
-      <div class="flex w-full flex-1 flex-col items-center justify-center gap-[16pt]">
+      <div class="flex w-full flex-1 flex-col items-center justify-center">
         ${brandMark()}
 
-        <div class="flex w-full justify-center">
+        <div class="mt-[${GAP_FOR_ELEMENTS}pt] flex w-full justify-center">
           <span class="ribbon w-[330pt] [-webkit-mask-image:var(--brush)] [mask-image:var(--brush)] [-webkit-mask-size:100%_100%] [mask-size:100%_100%] [-webkit-mask-repeat:no-repeat] [mask-repeat:no-repeat] ${badge} whitespace-nowrap px-[20pt] py-[11pt] text-center font-sans text-[17pt] font-semibold uppercase leading-none tracking-[0.14em] text-white">
             ${d.course}
           </span>
         </div>
 
-        <div class="relative z-10 flex w-full flex-col items-center px-[26pt]">
-          <div class="flex h-[128pt] w-full flex-col items-center justify-center overflow-hidden">
+        <div class="relative z-10 mt-[${GAP_FOR_ELEMENTS}pt] flex w-full flex-col items-center px-[26pt]">
+          <div class="flex h-[128pt] w-full flex-col items-center justify-start overflow-hidden">
             <h3 class="dish-name text-balance text-center font-playfair text-[38pt] font-bold leading-[1.15] text-ink">
               ${d.name}
             </h3>
@@ -236,14 +242,14 @@ function buildDocument(order) {
   :root {
     --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='28 23 444 87' preserveAspectRatio='none'%3E%3Cpath fill='%23000' d='M60 25 C45 25 35 33 35 42 C35 47 40 51 45 54 C38 57 30 62 30 70 C30 77 38 82 48 84 C40 88 35 93 35 98 C35 106 50 108 70 108 L430 108 C450 108 465 106 465 98 C465 93 460 88 452 84 C462 82 470 77 470 70 C470 62 462 57 455 54 C460 51 465 47 465 42 C465 33 455 25 440 25 Z'/%3E%3C/svg%3E");
   }
-  .card-frame { --w: 2pt; --m: 15pt; }
+  .card-frame { --w: 2pt; --r: 16pt; }
   .card-frame::before, .card-frame::after, .card-frame > i {
-    content: ''; position: absolute; width: calc(var(--m) * 1.414); height: var(--w); background: #A98B4F; border-radius: var(--w);
+    content: ''; position: absolute; width: var(--r); height: var(--r); border: var(--w) solid #A98B4F; background: transparent;
   }
-  .card-frame::before { top: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, -50%) rotate(-45deg); }
-  .card-frame::after { top: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, -50%) rotate(45deg); }
-  .card-frame > i:first-child { bottom: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, 50%) rotate(45deg); }
-  .card-frame > i:last-child { bottom: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, 50%) rotate(-45deg); }
+  .card-frame::before { top: 0; left: 0; border-left: none; border-top: none; border-bottom-right-radius: var(--r); }
+  .card-frame::after { top: 0; right: 0; border-right: none; border-top: none; border-bottom-left-radius: var(--r); }
+  .card-frame > i:first-child { bottom: 0; left: 0; border-left: none; border-bottom: none; border-top-right-radius: var(--r); }
+  .card-frame > i:last-child { bottom: 0; right: 0; border-right: none; border-bottom: none; border-top-left-radius: var(--r); }
   .card-frame.is-plain::before, .card-frame.is-plain::after, .card-frame.is-plain > i { display: none; }
 
   @page { size: ${PRINT.SHEET_W.toFixed(2)}in ${PRINT.SHEET_H.toFixed(2)}in; margin: 0; }

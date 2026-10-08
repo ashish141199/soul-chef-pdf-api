@@ -26,7 +26,7 @@
   <script>
     const PRINT = {
       // --- the card (one printed name tag) ---
-      CARD_W: 14.272,     // card width,  in
+      CARD_W: 7.93,       // card width,  in
       CARD_H: 5.58,       // card height, in
 
       // --- the sheet the cards are printed on ---
@@ -34,14 +34,14 @@
       SHEET_H: 23.385,    // sheet height, in
 
       // --- how the cards sit on the sheet ---
-      COLS: 1,             // cards across
+      COLS: 2,             // cards across
       ROWS: 4,             // cards down
       GAP: 0.18,           // space between cards, in
       // PAD_SIDE is exactly (SHEET_W - COLS*CARD_W - (COLS-1)*GAP) / 2, so the
-      // card is centred and the row fits to the thou. Top/bottom are trimmed
-      // because four 5.58in cards plus gaps need 23.21in of the sheet's 23.385in.
+      // row is centred and fits to the thou. Top/bottom are trimmed because
+      // four 5.58in cards plus gaps need 23.21in of the sheet's 23.385in.
       PAD_TOP: 0.2,       // sheet padding, in
-      PAD_SIDE: 1.1295,
+      PAD_SIDE: 0.2455,
       PAD_BOTTOM: 0.15,
 
       // Type inside a card is sized in points so it stays absolute against
@@ -77,6 +77,11 @@
       out.forEach((m) => console.warn('PRINT geometry: ' + m));
       return out;
     })();
+
+    // the one shared gap between the toque, title, tagline, course badge and
+    // dish name in a dish card's header stack — every mt-[...] in that stack
+    // reads this value, so changing it here changes them all together
+    const GAP_FOR_ELEMENTS = 15; // pt
   </script>
 
   <script>
@@ -123,26 +128,44 @@
       --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='28 23 444 87' preserveAspectRatio='none'%3E%3Cpath fill='%23000' d='M60 25 C45 25 35 33 35 42 C35 47 40 51 45 54 C38 57 30 62 30 70 C30 77 38 82 48 84 C40 88 35 93 35 98 C35 106 50 108 70 108 L430 108 C450 108 465 106 465 98 C465 93 460 88 452 84 C462 82 470 77 470 70 C470 62 462 57 455 54 C460 51 465 47 465 42 C465 33 455 25 440 25 Z'/%3E%3C/svg%3E");
     }
 
-    /* The four chamfered corner diagonals. Two are pseudo-elements and two
-       are <i> children; a utility class cannot generate a pseudo-element's
-       content, so the geometry stays in CSS. Each diagonal spans the points
-       --m along the edges meeting at a corner, positioned by its own centre
-       then rotated about that centre. */
-    .card-frame { --w: 2pt; --m: 15pt; }
+    /* The four corner accents: a small curved stroke sitting right at each
+       corner of the card's own straight border, so the border reads as
+       rounded there while staying sharp everywhere else. Two are
+       pseudo-elements and two are <i> children; a utility class cannot
+       generate a pseudo-element's content, so the geometry stays in CSS.
+       Each stroke is a tiny ring with only its outer corner showing, so
+       border-radius draws the curve. */
+    .card-frame { --w: 2pt; --r: 16pt; }
     .card-frame::before,
     .card-frame::after,
     .card-frame > i {
       content: '';
       position: absolute;
-      width: calc(var(--m) * 1.414);
-      height: var(--w);
-      background: #A98B4F;
-      border-radius: var(--w);
+      width: var(--r);
+      height: var(--r);
+      border: var(--w) solid #A98B4F;
+      background: transparent;
     }
-    .card-frame::before { top: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, -50%) rotate(-45deg); }
-    .card-frame::after { top: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, -50%) rotate(45deg); }
-    .card-frame > i:first-child { bottom: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, 50%) rotate(45deg); }
-    .card-frame > i:last-child { bottom: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, 50%) rotate(-45deg); }
+    .card-frame::before {
+      top: 0; left: 0;
+      border-left: none; border-top: none;
+      border-bottom-right-radius: var(--r);
+    }
+    .card-frame::after {
+      top: 0; right: 0;
+      border-right: none; border-top: none;
+      border-bottom-left-radius: var(--r);
+    }
+    .card-frame > i:first-child {
+      bottom: 0; left: 0;
+      border-left: none; border-bottom: none;
+      border-top-right-radius: var(--r);
+    }
+    .card-frame > i:last-child {
+      bottom: 0; right: 0;
+      border-right: none; border-bottom: none;
+      border-top-left-radius: var(--r);
+    }
     /* the title card's frame is a plain rectangle, with no corner diagonals */
     .card-frame.is-plain::before,
     .card-frame.is-plain::after,
@@ -266,11 +289,13 @@ const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-h
 const CORNER_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[30pt] w-auto">`;
 
-/* foliage that fills a bottom corner and spills inward */
+/* foliage that fills a bottom corner and spills inward. The right sprig is
+   the same artwork mirrored with a transform, not a second asset, so it is
+   always a true mirror of the left one rather than its own separate lean. */
 const EDGE_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
-const EDGE_SPRIG_R = `<img src="${ASSET_BASE}/bottom_right_leaf-removebg-preview.png" alt="" aria-hidden="true"
-  class="h-[78pt] w-auto">`;
+const EDGE_SPRIG_R = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto [transform:scaleX(-1)]">`;
 
 /* small diamond ornament under the title card's tagline */
 const FLEURON = `<svg viewBox="0 0 40 10" class="mx-auto h-[8pt] w-[41pt]" aria-hidden="true">
@@ -505,10 +530,10 @@ function cardShell(inner, extra = '', frameClass = '') {
 }
 
 function brandMark() {
-  return `<div class="relative w-full pt-[2pt]">
+  return `<div class="relative w-full pt-[20pt]">
     ${TOQUE}
-    <p class="mt-[5pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
-    <p class="mt-[7pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
+    <p class="mt-[1pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[${GAP_FOR_ELEMENTS}pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
       &mdash; Stress Free Experience For Your Event &mdash;
     </p>
   </div>`;
@@ -517,8 +542,8 @@ function brandMark() {
 function titleCard(date, venue, pax) {
   return cardShell(`
     <div class="relative flex h-full w-full flex-col items-center justify-center text-center">
-      <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
-      <div class="pointer-events-none absolute bottom-[2pt] right-[2pt]">${EDGE_SPRIG_R}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]">${EDGE_SPRIG_R}</div>
       <img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true" class="mx-auto h-[36pt] w-auto">
       <p class="mt-[5pt] font-display text-[40pt] font-semibold leading-none tracking-[0.12em] text-ink">SOUL CHEF</p>
       <p class="mt-[7pt] font-sans text-[12pt] font-medium uppercase leading-none tracking-[0.1em] text-ink/75">
@@ -553,34 +578,38 @@ function dishCard(d) {
          the card's bottom edge. Stretching all four to fill the height is what
          left a hole between the course badge and the dish name. -->
     <div class="relative flex h-full w-full flex-col items-center">
-      <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]">${EDGE_SPRIG}</div>
+      <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]">${EDGE_SPRIG_R}</div>
 
       <!-- the diet mark is the one thing a guest must read at a glance, so it
            gets the FSSAI-style bordered square, pinned to the top-left corner -->
-      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[10pt]">
-        <span class="flex h-[26pt] w-[26pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
+        <span class="flex h-[25pt] w-[25pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
           <span class="h-[15pt] w-[15pt] rounded-full ${dotColor}"></span>
         </span>
-        <span class="font-sans text-[20pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
+        <span class="font-sans text-[19pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
       </div>
 
-      <div class="flex w-full flex-1 flex-col items-center justify-center gap-[16pt]">
+      <div class="flex w-full flex-1 flex-col items-center justify-center">
         ${brandMark()}
 
-        <div class="flex w-full justify-center">
+        <div class="mt-[${GAP_FOR_ELEMENTS}pt] flex w-full justify-center">
           <span class="ribbon w-[330pt] [-webkit-mask-image:var(--brush)] [mask-image:var(--brush)] [-webkit-mask-size:100%_100%] [mask-size:100%_100%] [-webkit-mask-repeat:no-repeat] [mask-repeat:no-repeat] ${badge} whitespace-nowrap px-[20pt] py-[11pt] text-center font-sans text-[17pt] font-semibold uppercase leading-none tracking-[0.14em] text-white">
             ${d.course}
           </span>
         </div>
 
-        <div class="relative z-10 flex w-full flex-col items-center px-[26pt]">
+        <div class="relative z-10 mt-[${GAP_FOR_ELEMENTS}pt] flex w-full flex-col items-center px-[26pt]">
           <!-- h-[128pt] is the room between the course badge and the bottom
                rule: about two lines at the shared size. fitNames measures the
-               inner span against it, so it decides how large the set can be -->
+               inner span against it, so it decides how large the set can be.
+               justify-start (not -center): a one-line name should sit right
+               after the badge gap, not be pushed down to the middle of the
+               space reserved for a two-line name. -->
           <!-- the sub-note belongs to the name, so it sits inside the same
-               centred box: outside it, the box's fixed height pushed the note
-               away from the name it describes -->
-          <div class="flex h-[128pt] w-full flex-col items-center justify-center overflow-hidden">
+               box: outside it, the box's fixed height pushed the note away
+               from the name it describes -->
+          <div class="flex h-[128pt] w-full flex-col items-center justify-start overflow-hidden">
             <h3 class="dish-name text-balance text-center font-playfair ${nameSize(d.name)} font-bold leading-[1.15] text-ink">
               ${d.name}
             </h3>
@@ -668,15 +697,22 @@ async function render(opts = {}) {
   }
 
   errEl.hidden = true;
+  await renderCards(data, opts);
+}
 
+/* Builds the card sheets and drops them into the page — the part of render()
+   that is pure layout, with no API call. Split out so a static design
+   preview can call it directly with dummy data on load, instead of forcing
+   a parse just to see the current card design. */
+async function renderCards(data, opts = {}) {
   // every card, in print order
   const main = [
     ...data.dishes.map(dishCard),
   ];
 
-  // Cap each sheet to CARDS_PER_SHEET (4 cols x 4 rows) so a sheet always
-  // holds to one A4 landscape page; anything beyond that continues on the
-  // next sheet rather than stretching this one.
+  // Cap each sheet to CARDS_PER_SHEET (PRINT.COLS x PRINT.ROWS) so a sheet
+  // always holds to one page; anything beyond that continues on the next
+  // sheet rather than stretching this one.
   const sheets = [];
   for (let i = 0; i < main.length; i += CARDS_PER_SHEET) {
     sheets.push(main.slice(i, i + CARDS_PER_SHEET));
@@ -689,21 +725,23 @@ async function render(opts = {}) {
   ).join('');
 
   wrapEl.hidden = false;
-  printBtn.hidden = false;
+  printBtn.hidden = opts.preview ? true : false;
 
   const n = data.dishes.length;
-  countEl.textContent = `${n} dish card${n === 1 ? '' : 's'}`;
+  countEl.textContent = opts.preview ? 'Design preview' : `${n} dish card${n === 1 ? '' : 's'}`;
 
   // dishes the model was unsure about: worth an eye before printing, since a
   // wrong veg/non-veg dot is the one mistake that matters on a buffet table
-  const review = data.dishes.filter((d) => d.unsure);
-  if (review.length) {
-    errEl.hidden = false;
-    errEl.className = 'mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800 ring-1 ring-amber-200';
-    errEl.textContent = 'Please double-check the veg/non-veg mark on: ' +
-      review.map((d) => d.name).join(', ');
-  } else {
-    errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+  if (!opts.preview) {
+    const review = data.dishes.filter((d) => d.unsure);
+    if (review.length) {
+      errEl.hidden = false;
+      errEl.className = 'mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800 ring-1 ring-amber-200';
+      errEl.textContent = 'Please double-check the veg/non-veg mark on: ' +
+        review.map((d) => d.name).join(', ');
+    } else {
+      errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+    }
   }
   // the sheets have just been rebuilt, so any PDF held from before is stale
   if (pdfUrl) { URL.revokeObjectURL(pdfUrl); pdfUrl = null; pdfKey = null; }
@@ -726,6 +764,22 @@ async function render(opts = {}) {
   updateSheetScale();
   if (opts.scroll) wrapEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   if (opts.pdf) openPdfTab();
+}
+
+/* Sample dishes shown on load, so the card design can be checked (and
+   tweaked) without waiting on a parse call every time. Covers the same
+   course badges and both veg/non-veg marks real orders use. */
+const PREVIEW_DATA = {
+  dishes: [
+    { course: 'Welcome Drink', name: 'Classic Lemonade', note: '', veg: true, unsure: false },
+    { course: 'Starters', name: 'Chicken Tikka', note: '', veg: false, unsure: false },
+    { course: 'Main Course', name: 'Palak Paneer', note: '', veg: true, unsure: false },
+    { course: 'Desserts', name: 'Angoori Ras Malai', note: '', veg: true, unsure: false },
+  ],
+};
+
+function renderPreview() {
+  renderCards(PREVIEW_DATA, { preview: true });
 }
 
 /* Shrink any dish name that still does not fit its card.
@@ -1053,6 +1107,10 @@ document.getElementById('sampleBtn').addEventListener('click', () => {
   orderEl.value = SAMPLE_ORDER;
   orderEl.dispatchEvent(new Event('input'));
 });
+
+// show the current card design on load, with no order text and no API
+// call, so the layout can be checked and tweaked immediately
+renderPreview();
 </script>
 </body>
 </html>

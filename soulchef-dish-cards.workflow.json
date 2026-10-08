@@ -72,7 +72,7 @@
         "operation": "completion",
         "respondWith": "returnBinary",
         "completionTitle": "Your dish cards are ready",
-        "completionMessage": "={{ 'The PDF is downloading. The sheet is A2 portrait, 16.531 x 23.385 in (42.0 x 59.4 cm); print at 100% on A2. Each card is 14.272 x 5.58 in (36.2 x 14.2 cm), 4 to a sheet - cut along the card edges.' + ($('Build replacements').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Build replacements').item.json.review.join(', ') : '') }}",
+        "completionMessage": "={{ 'The PDF is downloading. The sheet is A2 portrait, 16.531 x 23.385 in (42.0 x 59.4 cm); print at 100% on A2. Each card is 7.93 x 5.58 in (20.1 x 14.2 cm), 8 to a sheet - cut along the card edges.' + ($('Build replacements').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Build replacements').item.json.review.join(', ') : '') }}",
         "inputDataFieldName": "data",
         "options": {
           "customCss": ":root { --container-width: 95%; --padding-card: 32px; }\n.container { max-width: 1100px; }"
