@@ -305,6 +305,8 @@ async function renderPdf(order) {
 
   try {
     const page = await browser.newPage();
+    page.on('requestfailed', (r) => console.error('[renderPdf] request failed:', r.url(), r.failure()?.errorText));
+    page.on('console', (msg) => console.log('[renderPdf] page console:', msg.type(), msg.text()));
 
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 50000 });
 
@@ -318,6 +320,18 @@ async function renderPdf(order) {
     await page.waitForFunction(() => {
       return [...document.images].every((img) => img.complete);
     }, { timeout: 15000 }).catch(() => {});
+
+    const imageReport = await page.evaluate(() => (
+      [...document.images].map((img) => ({
+        src: img.src,
+        complete: img.complete,
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+      }))
+    ));
+    console.table(imageReport);
+    const broken = imageReport.filter((i) => i.naturalWidth === 0);
+    if (broken.length) console.error('[renderPdf] broken images:', broken.map((i) => i.src));
 
     await page.evaluateHandle('document.fonts.ready');
 
@@ -383,6 +397,8 @@ async function renderPdfFromHtml(html) {
 
   try {
     const page = await browser.newPage();
+    page.on('requestfailed', (r) => console.error('[renderPdfFromHtml] request failed:', r.url(), r.failure()?.errorText));
+    page.on('console', (msg) => console.log('[renderPdfFromHtml] page console:', msg.type(), msg.text()));
     await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 50000 });
     await page.waitForFunction(() => {
       const s = document.querySelector('.sheet');
@@ -391,6 +407,18 @@ async function renderPdfFromHtml(html) {
     await page.waitForFunction(() => {
       return [...document.images].every((img) => img.complete);
     }, { timeout: 15000 }).catch(() => {});
+    const imageReport = await page.evaluate(() => (
+      [...document.images].map((img) => ({
+        src: img.src,
+        complete: img.complete,
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+      }))
+    ));
+    console.table(imageReport);
+    const broken = imageReport.filter((i) => i.naturalWidth === 0);
+    if (broken.length) console.error('[renderPdfFromHtml] broken images:', broken.map((i) => i.src));
+
     await page.evaluateHandle('document.fonts.ready');
     return await page.pdf({ printBackground: true, preferCSSPageSize: true });
   } finally {
