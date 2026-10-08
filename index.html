@@ -362,11 +362,23 @@ const API_BASE = 'https://soulchef-pdf-api.vercel.app';
 const PARSE_URL = API_BASE + '/api/parse';
 const MODEL = 'openai/gpt-6-luna';
 
-const SYSTEM_PROMPT = `You extract catering order details from a free-form WhatsApp message and return JSON only.
+const SYSTEM_PROMPT = `You extract catering order details from free-form WhatsApp text and return JSON only.
+
+- THE TEXT MAY HOLD SEVERAL ORDERS, not just one. A paste often carries a whole
+  forwarded chat: several messages back to back, each starting with a line like
+  "[10/8, 1:23 PM] +91 75068 67906: *Order 3: 9 October 2026*" and each with its
+  own "Menu for the event" and its own "*Note* -" block. Read EVERY message to
+  the very end of the text and merge all of their menus into ONE dishes array,
+  in the order they appear. Never stop after the first message. A six-message
+  paste whose menus hold 30 items must return all 30, not the first message's 4.
 
 Rules:
-- dishes: every menu item, in menu order. Ignore non-menu lines (name, phone,
-  pax, location/venue, report/start time, and everything from "Note" onwards).
+- dishes: every menu item from every message, in menu order. Ignore non-menu
+  lines (name, phone, pax, location/venue, report/start time). A "Note" block
+  ends only ITS OWN message — skip to the next message's header and keep going;
+  it never ends the whole text.
+- The same item may appear in several of the messages (an AM and a PM slot both
+  listing "Tea/Coffee"). Emit it only ONCE, at its first appearance.
 - A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line
   with no bullet: "Welcome Drinks", "Soup", "Starters on Buffet", "Main Course
   on Buffet", "Accompaniments", "Deserts", "Desserts". Never emit a dish whose
@@ -417,6 +429,8 @@ Rules:
   (Caesar Salad may contain anchovy; a mousse or panna cotta may contain
   gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or
   shrimp paste). "low" is how you express doubt — the diet field stays "V".
+The remaining fields describe the event as a whole, not a single dish. When the
+text holds several messages, take each one from the FIRST message that has it.
 - eventDate: the date as written, e.g. "28 September 2026". Empty string if absent.
 - venue: the place, from a "Venue:" or "Location:" line. Shorten it for a card:
   drop a leading floor number and turn "Birla Centurion-Worli" into
@@ -509,8 +523,14 @@ async function parseOrder(text) {
     pax: parsed.pax || '',
     reportTime: parsed.reportTime || '',
     startTime: parsed.startTime || '',
+    // A paste can carry several forwarded orders, each repeating the same
+    // filler item ("Tea/Coffee", "Biscuits"), and one card per repeat would
+    // print the same card several times. The prompt asks for one entry per
+    // dish, but the model is not reliable about it, so enforce it here too.
     dishes: (parsed.dishes || [])
       .filter((d) => d && d.name)
+      .filter((d, i, all) =>
+        all.findIndex((o) => o.name.trim().toLowerCase() === d.name.trim().toLowerCase()) === i)
       .map((d) => ({
         course: d.category || 'Main Course',
         name: d.name,
@@ -618,7 +638,7 @@ function dishCard(d) {
         </div>
       </div>
 
-      <div class="relative z-10 mb-[22pt] flex flex-col items-center">
+      <div class="relative z-10 mb-[40pt] flex flex-col items-center">
         ${BOTTOM_RULE}
       </div>
     </div>`);
