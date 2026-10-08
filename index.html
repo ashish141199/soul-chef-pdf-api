@@ -248,21 +248,27 @@ const LEAF = `<svg viewBox="0 0 40 16" class="h-[15pt] w-[40pt]" aria-hidden="tr
   <path d="M20 7 C23 7, 25 5.5, 26 3 C23 3, 21 4.5, 20 7 Z" fill="#A98B4F" opacity="0.55"/>
 </svg>`;
 
-const TOQUE = `<img src="assets/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
+/* absolute, not relative: this markup is serialized and posted to the
+   Vercel /api/pdf function, which renders it in a sandboxed Chromium with
+   no access to this page's own origin, so a relative "assets/..." path
+   resolves to nothing there even though it works fine on-screen. */
+const ASSET_BASE = 'https://soulchef-pdf-api.vercel.app/assets';
+
+const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
   class="mx-auto h-[30pt] w-auto">`;
 
 /* the rule-and-sprig divider that closes each dish card */
-const BOTTOM_RULE = `<img src="assets/card bottom line.png" alt="" aria-hidden="true"
+const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-hidden="true"
   class="h-auto w-[230pt]">`;
 
 /* a smaller leaf sprig, used in the poster's footer corners */
-const CORNER_SPRIG = `<img src="assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+const CORNER_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[30pt] w-auto">`;
 
 /* foliage that fills a bottom corner and spills inward */
-const EDGE_SPRIG = `<img src="assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+const EDGE_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
-const EDGE_SPRIG_R = `<img src="assets/bottom_right_leaf-removebg-preview.png" alt="" aria-hidden="true"
+const EDGE_SPRIG_R = `<img src="${ASSET_BASE}/bottom_right_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
 
 /* small diamond ornament under the title card's tagline */
@@ -301,7 +307,7 @@ function sheetFooter() {
   // artwork is fitted inside: a w-full image would scale to its own aspect
   // ratio and push the sheet past one page
   return `<div class="${FOOTER_CLASS}">
-    <img src="assets/footer.png" alt="" aria-hidden="true"
+    <img src="${ASSET_BASE}/footer.png" alt="" aria-hidden="true"
       class="block max-h-[48pt] w-full object-contain">
   </div>`;
 }
@@ -512,7 +518,7 @@ function titleCard(date, venue, pax) {
     <div class="relative flex h-full w-full flex-col items-center justify-center text-center">
       <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
       <div class="pointer-events-none absolute bottom-[2pt] right-[2pt]">${EDGE_SPRIG_R}</div>
-      <img src="assets/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true" class="mx-auto h-[36pt] w-auto">
+      <img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true" class="mx-auto h-[36pt] w-auto">
       <p class="mt-[5pt] font-display text-[40pt] font-semibold leading-none tracking-[0.12em] text-ink">SOUL CHEF</p>
       <p class="mt-[7pt] font-sans text-[12pt] font-medium uppercase leading-none tracking-[0.1em] text-ink/75">
         &mdash; Stress Free Experience For Your Event &mdash;
