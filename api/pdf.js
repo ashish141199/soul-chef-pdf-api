@@ -157,7 +157,9 @@ function dishCard(d) {
         <span class="font-sans text-[19pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
       </div>
 
-      <div class="flex w-full flex-1 flex-col items-center justify-center">
+      <!-- pb keeps the centred stack clear of the bottom rule, which is
+           absolutely positioned and so reserves no space of its own -->
+      <div class="flex w-full flex-1 flex-col items-center justify-center pb-[34pt]">
         ${brandMark()}
 
         <div class="mt-[${GAP_FOR_ELEMENTS}pt] flex w-full justify-center">
