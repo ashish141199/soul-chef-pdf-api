@@ -238,7 +238,7 @@ function buildDocument(order) {
   }
   .card-frame { --w: 2pt; --m: 15pt; }
   .card-frame::before, .card-frame::after, .card-frame > i {
-    content: ''; position: absolute; width: calc(var(--m) * 1.414); height: var(--w); background: #A98B4F;
+    content: ''; position: absolute; width: calc(var(--m) * 1.414); height: var(--w); background: #A98B4F; border-radius: var(--w);
   }
   .card-frame::before { top: calc(var(--m) / 2); left: calc(var(--m) / 2); transform: translate(-50%, -50%) rotate(-45deg); }
   .card-frame::after { top: calc(var(--m) / 2); right: calc(var(--m) / 2); transform: translate(50%, -50%) rotate(45deg); }
