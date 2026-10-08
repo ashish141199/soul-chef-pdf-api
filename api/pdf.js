@@ -53,10 +53,15 @@ const GAP_FOR_ELEMENTS = 20; // pt
 
 /* ---------- reused artwork/ornament snippets, ported from index.html ---------- */
 const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
-  class="mx-auto h-[30pt] w-auto">`;
+  class="mx-auto h-[44pt] w-auto">`;
 
+/* Sits on the frame's bottom border rather than in the flex flow. The artwork
+   is a 3:1 box (2172x724) whose visible line sits near its middle with
+   transparent padding around it, so the BOX is pinned to the frame line
+   (inset 10pt) and only the leaf rises above it — centring the box instead
+   would push 38pt of padding past the card edge, clipping the stem. */
 const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-hidden="true"
-  class="h-auto w-[230pt]">`;
+  class="absolute bottom-[2pt] left-1/2 h-auto w-[230pt] -translate-x-1/2">`;
 
 const EDGE_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
@@ -108,7 +113,7 @@ function cardShell(inner, extra = '', frameClass = '') {
 function brandMark() {
   return `<div class="relative w-full pt-[2pt]">
     ${TOQUE}
-    <p class="mt-[${GAP_FOR_ELEMENTS}pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[8pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
     <p class="mt-[${GAP_FOR_ELEMENTS}pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
       &mdash; Stress Free Experience For Your Event &mdash;
     </p>
@@ -143,6 +148,7 @@ function dishCard(d) {
     <div class="relative flex h-full w-full flex-col items-center">
       <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]">${EDGE_SPRIG}</div>
       <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]">${EDGE_SPRIG_R}</div>
+      ${BOTTOM_RULE}
 
       <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
         <span class="flex h-[25pt] w-[25pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
@@ -168,10 +174,6 @@ function dishCard(d) {
             ${d.note ? `<p class="mt-[5pt] text-center font-display text-[19pt] italic leading-tight text-ink">${d.note}</p>` : ''}
           </div>
         </div>
-      </div>
-
-      <div class="relative z-10 mb-[10pt] flex flex-col items-center">
-        ${BOTTOM_RULE}
       </div>
     </div>`);
 }
@@ -314,10 +316,18 @@ async function getBrowser() {
     browserPromise = null;
   }
 
-  browserPromise = puppeteer.launch({
+  // @sparticuz/chromium ships a Linux build for the Vercel sandbox, so off
+  // Vercel (a developer machine) it cannot run — fall back to the Chrome
+  // already installed there, via CHROME_PATH when it is somewhere unusual.
+  const onVercel = !!process.env.VERCEL;
+  browserPromise = puppeteer.launch(onVercel ? {
     args: chromium.args,
     executablePath: await chromium.executablePath(),
     headless: chromium.headless,
+  } : {
+    channel: process.env.CHROME_PATH ? undefined : 'chrome',
+    executablePath: process.env.CHROME_PATH || undefined,
+    headless: true,
   });
 
   const browser = await browserPromise;

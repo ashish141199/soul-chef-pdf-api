@@ -11,12 +11,13 @@
  *
  * No dependencies: Node's own http, fs and fetch cover it (Node 18+).
  */
-const http = require('http');
-const fs = require('fs');
-const path = require('path');
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 const PORT = process.env.PORT || 3000;
-const ROOT = __dirname;
+const ROOT = path.dirname(fileURLToPath(import.meta.url));
 
 /* ---------- .env: KEY=value per line, # comments and blanks skipped ---------- */
 function readEnv() {
@@ -95,128 +96,17 @@ async function handleParse(req, res) {
   }
 }
 
-/* ---------- POST /api/pdf: print the page's own markup to a real PDF -------
-   The browser cannot write a PDF without showing its print dialog, so the
-   page sends the finished document here and headless Chromium prints it.
-   Puppeteer is loaded on first use, so the parser still works without it. */
-let browserPromise = null;
-function getBrowser() {
-  if (!browserPromise) {
-    const puppeteer = require('puppeteer');
-    // one browser for the process: launching costs about a second
-    browserPromise = puppeteer.launch({ headless: true });
+/* ---------- POST /api/pdf -------------------------------------------------
+   Hand the request to the very function Vercel runs in production, so a card
+   rendered here is the same card the deployed endpoint draws. api/pdf.js is
+   an ES module and this server is CommonJS, hence the dynamic import; it is
+   cached after the first call. */
+let pdfHandlerPromise = null;
+function getPdfHandler() {
+  if (!pdfHandlerPromise) {
+    pdfHandlerPromise = import('./api/pdf.js').then((m) => m.default);
   }
-  return browserPromise;
-}
-
-/* Forget the browser and its page, so the next print starts a fresh one.
-   Chromium can exit on its own — a crash, the OS reclaiming it, a machine
-   waking from sleep — and a cached handle to a dead browser fails every
-   later print with "Connection closed" until the server restarts. */
-function dropBrowser() {
-  const dying = browserPromise;
-  browserPromise = null;
-  pagePromise = null;
-  if (dying) dying.then((b) => b.close()).catch(() => {});
-}
-
-/* One page for the process, kept open between prints: creating one costs a
-   few hundred milliseconds, and setContent replaces the document completely,
-   so there is nothing to carry over from the previous render. */
-let pagePromise = null;
-async function getPage() {
-  if (!pagePromise) {
-    pagePromise = getBrowser().then((b) => b.newPage());
-  }
-
-  const page = await pagePromise;
-
-  // The cached page may have died since the last print, and an already-closed
-  // page resolves perfectly well — it only fails once it is used. Check it
-  // here so the caller always gets a page that is actually usable.
-  if (page.isClosed() || !page.browser().connected) {
-    dropBrowser();
-    pagePromise = getBrowser().then((b) => b.newPage());
-    return pagePromise;
-  }
-  return page;
-}
-
-/* The one page means two prints must not interleave, so each waits for the
-   one before it. Printing is a second at most, so a queue is enough; the
-   chain keeps going whether the previous print worked or not. */
-let pdfQueue = Promise.resolve();
-function queuePdf(job) {
-  const run = pdfQueue.then(job, job);
-  pdfQueue = run.catch(() => {});
-  return run;
-}
-
-async function renderOnce(html) {
-  let page;
-  try {
-    page = await getPage();
-  } catch (err) {
-    // a page that failed to open must not be cached, or every later print
-    // reuses the same rejected promise
-    dropBrowser();
-    throw err;
-  }
-
-  try {
-    // domcontentloaded, not networkidle0: the waits below are the real
-    // readiness conditions, so there is no reason to also sit through the
-    // network's 500ms idle window on every print
-    await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 60000 });
-
-    // The sheet's size comes from Tailwind utilities, which the CDN build
-    // generates by scanning the DOM — so a sheet can still be an unstyled
-    // block before that runs. Wait for it to report a real width (a sheet is
-    // inches wide, so anything under 500px is unstyled) before printing, or
-    // the PDF comes out at the wrong size.
-    await page.waitForFunction(() => {
-      const s = document.querySelector('.sheet');
-      return !s || s.offsetWidth > 500;
-    }, { timeout: 15000 }).catch(() => {});
-
-    // networkidle0 used to cover the artwork too, so wait for it explicitly:
-    // an image still loading prints as a blank gap, and nothing else here
-    // would catch that. A broken src also counts as settled, so one missing
-    // file cannot hang the print.
-    await page.waitForFunction(() => {
-      return [...document.images].every((img) => img.complete);
-    }, { timeout: 15000 }).catch(() => {});
-
-    await page.evaluateHandle('document.fonts.ready');
-
-    return await page.pdf({
-      printBackground: true,
-      preferCSSPageSize: true,   // honour the @page size the markup sets
-    });
-  } catch (err) {
-    // the page may be wedged, so drop it and let the next print open a fresh
-    // one rather than reusing a broken tab forever
-    dropBrowser();
-    throw err;
-  }
-}
-
-/* A dead browser only shows itself when it is used, so the first print after
-   Chromium exits is lost however carefully getPage checks. dropBrowser has
-   already cleared the handle by the time we get here, so one retry starts a
-   genuinely fresh browser and the user never sees the failure. */
-function isDisconnected(err) {
-  const m = (err && err.message) || '';
-  return /Connection closed|Target closed|Session closed|detached|Protocol error|browser has disconnected/i.test(m);
-}
-
-async function renderPdf(html) {
-  try {
-    return await renderOnce(html);
-  } catch (err) {
-    if (!isDisconnected(err)) throw err;
-    return await renderOnce(html);
-  }
+  return pdfHandlerPromise;
 }
 
 async function handlePdf(req, res) {
@@ -226,30 +116,26 @@ async function handlePdf(req, res) {
     if (raw.length > 2e7) { req.destroy(); return; }   // a big order is still only a few MB
   }
 
-  let html;
+  let body;
   try {
-    html = JSON.parse(raw).html;
+    body = JSON.parse(raw);
   } catch {
     return json(res, 400, { error: 'Request body was not JSON.' });
   }
-  if (!html) return json(res, 400, { error: 'No html to print.' });
+
+  // api/pdf.js is written against Vercel's req/res, which give it a parsed
+  // body and the express-style helpers below; Node's own objects have
+  // neither, so they are filled in here.
+  req.body = body;
+  res.status = (code) => { res.statusCode = code; return res; };
+  res.json = (payload) => { json(res, res.statusCode || 200, payload); return res; };
+  res.send = (payload) => { res.end(payload); return res; };
 
   try {
-    const pdf = await queuePdf(() => renderPdf(html));
-
-    res.writeHead(200, {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': 'inline; filename="soul-chef-dish-cards.pdf"',
-      'Content-Length': pdf.length,
-    });
-    res.end(pdf);
+    const handler = await getPdfHandler();
+    await handler(req, res);
   } catch (err) {
-    const missing = err && err.code === 'MODULE_NOT_FOUND';
-    json(res, missing ? 501 : 500, {
-      error: missing
-        ? 'Puppeteer is not installed. Run "npm install puppeteer" in this folder and restart the server.'
-        : 'Could not render the PDF: ' + err.message,
-    });
+    if (!res.headersSent) json(res, 500, { error: 'Could not render the PDF: ' + err.message });
   }
 }
 
@@ -301,8 +187,8 @@ http.createServer((req, res) => {
 }).listen(PORT, () => {
   console.log('Soul Chef dish cards -> http://localhost:' + PORT);
 
-  // Open the browser and its page now rather than on the first Open PDF, so
-  // that click does not pay the launch. A failure here is not fatal: the
-  // parser works without Puppeteer, and the print reports the error itself.
-  getPage().catch(dropBrowser);
+  // Load the render module now rather than on the first Open PDF, so that
+  // click does not pay the import. A failure here is not fatal: the parser
+  // works without it, and the print reports the error itself.
+  getPdfHandler().catch(() => {});
 });
