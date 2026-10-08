@@ -170,7 +170,7 @@ function dishCard(d) {
         </div>
       </div>
 
-      <div class="relative z-10 mb-[40pt] flex flex-col items-center">
+      <div class="relative z-10 mb-[10pt] flex flex-col items-center">
         ${BOTTOM_RULE}
       </div>
     </div>`);
