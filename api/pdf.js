@@ -61,7 +61,7 @@ const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" ar
    (inset 10pt) and only the leaf rises above it — centring the box instead
    would push 38pt of padding past the card edge, clipping the stem. */
 const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-hidden="true"
-  class="absolute bottom-[2pt] left-1/2 h-auto w-[230pt] -translate-x-1/2">`;
+  class="absolute bottom-[-14pt] left-1/2 h-auto w-[230pt] -translate-x-1/2">`;
 
 const EDGE_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
