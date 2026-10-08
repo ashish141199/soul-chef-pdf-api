@@ -19,7 +19,7 @@ This API endpoint (`POST /api/pdf`) takes parsed order data and generates a prof
 
 - **Runtime**: Node.js (ES Modules)
 - **PDF Generation**: [Puppeteer Core](https://www.npmjs.com/package/puppeteer-core)
-- **Headless Browser**: [@sparticuz/chromium](https://www.npmjs.com/package/@sparticuz/chromium)
+- **Headless Browser**: [@sparticuz/chromium](https://www.npmjs.com/package/@sparticuz/chromium) 
 - **Styling**: Tailwind CSS (CDN)
 - **Fonts**: Google Fonts (Cormorant Garamond, Jost, Playfair Display, Poppins, Caveat)
 - **Deployment**: Vercel (serverless) 
