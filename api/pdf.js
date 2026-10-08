@@ -26,7 +26,7 @@ import puppeteer from 'puppeteer-core';
 /* assets/*.png live in this same Vercel project (see vercel.json / the
    assets/ folder next to api/), so Chromium can reach them over the network
    regardless of where the calling page (index.html, n8n, ...) is hosted. */
-const ASSET_BASE = 'https://vercel-time-api-pi.vercel.app/assets';
+const ASSET_BASE = 'https://soulchef-pdf-api.vercel.app/assets';
 
 /* ==================== PRINT SIZE — keep in step with index.html ====================
    All lengths are INCHES. See index.html's own PRINT block for the full
@@ -138,11 +138,11 @@ function dishCard(d) {
     <div class="relative flex h-full w-full flex-col items-center">
       <div class="pointer-events-none absolute bottom-[2pt] left-[2pt]">${EDGE_SPRIG}</div>
 
-      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
-        <span class="flex h-[20pt] w-[20pt] items-center justify-center border-[2pt] border-solid ${dotBorder}">
-          <span class="h-[11pt] w-[11pt] rounded-full ${dotColor}"></span>
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[10pt]">
+        <span class="flex h-[26pt] w-[26pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
+          <span class="h-[15pt] w-[15pt] rounded-full ${dotColor}"></span>
         </span>
-        <span class="font-sans text-[16pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
+        <span class="font-sans text-[20pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
       </div>
 
       <div class="flex w-full flex-1 flex-col items-center justify-center gap-[16pt]">

@@ -46,7 +46,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://vercel-time-api-pi.vercel.app/api/pdf",
+        "url": "https://soulchef-pdf-api.vercel.app/api/pdf",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ order: $('Build replacements').item.json.order }) }}",

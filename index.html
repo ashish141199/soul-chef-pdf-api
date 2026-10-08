@@ -217,6 +217,10 @@
             class="rounded-md bg-gold px-3 py-1.5 text-[11px] font-semibold text-white transition hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-gold/40 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
             Open PDF
           </button>
+          <button type="button" id="sampleBtn"
+            class="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-gold/40 focus:ring-offset-2">
+            Use Sample Menu
+          </button>
         </div>
 
         <p id="error" hidden class="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200"></p>
@@ -322,7 +326,7 @@ const BADGE = {
    API_BASE points at the deployed Vercel functions directly so this page
    works wherever it is served from (local server.js, n8n, a static host) —
    not only when it happens to share an origin with the functions. */
-const API_BASE = 'https://vercel-time-api-pi.vercel.app';
+const API_BASE = 'https://soulchef-pdf-api.vercel.app';
 const PARSE_URL = API_BASE + '/api/parse';
 const MODEL = 'openai/gpt-6-luna';
 
@@ -546,11 +550,11 @@ function dishCard(d) {
 
       <!-- the diet mark is the one thing a guest must read at a glance, so it
            gets the FSSAI-style bordered square, pinned to the top-left corner -->
-      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
-        <span class="flex h-[20pt] w-[20pt] items-center justify-center border-[2pt] border-solid ${dotBorder}">
-          <span class="h-[11pt] w-[11pt] rounded-full ${dotColor}"></span>
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[10pt]">
+        <span class="flex h-[26pt] w-[26pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
+          <span class="h-[15pt] w-[15pt] rounded-full ${dotColor}"></span>
         </span>
-        <span class="font-sans text-[16pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
+        <span class="font-sans text-[20pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
       </div>
 
       <div class="flex w-full flex-1 flex-col items-center justify-center gap-[16pt]">
@@ -992,6 +996,56 @@ form.addEventListener('submit', (e) => { e.preventDefault(); render({ scroll: tr
 
 // the preview is already on screen by now, so this just prints it
 printBtn.addEventListener('click', openPdfTab);
+
+const SAMPLE_ORDER = `*Order 3: 8 October 2026*
+
+Name: Venu - 9867909654
+
+No of pax: 35 pax (3 Jain)
+
+Report time: 10 am
+Start time: 11:00 am
+
+Location: Kotak mahindra bank, 10th floor, godrej 2, pirojsha nagar, eastern express highway, vikroli east, mumbai 400079
+
+*Menu for the event*
+
+*Welcome Drink*
+
+Classic Lemonade
+\t
+*Veg Starters on buffet*
+
+Beetroot pops
+\t
+*Salads*
+Green salad
+Papad pickle Raita
+\t
+*Veg Mains on buffet*
+Palak Paneer
+Amritsari Chole
+\t
+Dal\t
+Vegetable pakora curry
+\t
+*Rice*
+Steam Rice
+\t
+*Breads*
+Phulka Roti /Bread Kulcha
+\t
+*Desserts*
+Angoori Ras malai
+
+*Note* -
+Entire catering
+Carry Induction and Oven`;
+
+document.getElementById('sampleBtn').addEventListener('click', () => {
+  orderEl.value = SAMPLE_ORDER;
+  orderEl.dispatchEvent(new Event('input'));
+});
 </script>
 </body>
 </html>
