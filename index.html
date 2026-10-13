@@ -377,8 +377,10 @@ Rules:
   lines (name, phone, pax, location/venue, report/start time). A "Note" block
   ends only ITS OWN message — skip to the next message's header and keep going;
   it never ends the whole text.
-- The same item may appear in several of the messages (an AM and a PM slot both
-  listing "Tea/Coffee"). Emit it only ONCE, at its first appearance.
+- The same item may appear more than once, whether repeated within one message
+  or across several messages (an AM and a PM slot both listing "Tea/Coffee").
+  Emit EVERY occurrence as its own entry, in the order it appears. Do not
+  deduplicate dishes.
 - A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line
   with no bullet: "Welcome Drinks", "Soup", "Starters on Buffet", "Main Course
   on Buffet", "Accompaniments", "Deserts", "Desserts". Never emit a dish whose
@@ -523,14 +525,8 @@ async function parseOrder(text) {
     pax: parsed.pax || '',
     reportTime: parsed.reportTime || '',
     startTime: parsed.startTime || '',
-    // A paste can carry several forwarded orders, each repeating the same
-    // filler item ("Tea/Coffee", "Biscuits"), and one card per repeat would
-    // print the same card several times. The prompt asks for one entry per
-    // dish, but the model is not reliable about it, so enforce it here too.
     dishes: (parsed.dishes || [])
       .filter((d) => d && d.name)
-      .filter((d, i, all) =>
-        all.findIndex((o) => o.name.trim().toLowerCase() === d.name.trim().toLowerCase()) === i)
       .map((d) => ({
         course: d.category || 'Main Course',
         name: d.name,
