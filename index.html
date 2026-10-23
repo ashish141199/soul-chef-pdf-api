@@ -247,6 +247,13 @@
           </button>
         </div>
 
+        <div id="progressWrap" hidden class="mt-2">
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div id="progressBar" class="h-full w-0 rounded-full bg-gold transition-[width] duration-200 ease-out"></div>
+          </div>
+          <p id="progressLabel" class="mt-1 text-[10px] text-slate-500"></p>
+        </div>
+
         <p id="error" hidden class="mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200"></p>
       </form>
     </div>
@@ -358,7 +365,9 @@ const BADGE = {
    API_BASE points at the deployed Vercel functions directly so this page
    works wherever it is served from (local server.js, n8n, a static host) —
    not only when it happens to share an origin with the functions. */
-const API_BASE = 'https://soulchef-pdf-api.vercel.app';
+const API_BASE = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
+  ? ''
+  : 'https://soulchef-pdf-api.vercel.app';
 const PARSE_URL = API_BASE + '/api/parse';
 const MODEL = 'openai/gpt-6-luna';
 
@@ -393,24 +402,38 @@ Rules:
 
   is ONE dish, "Broccoli & Roasted Almond Soup with Garlic Stick", in the
   "Soup" category — not a dish called "Soup".
+- An "&"-joined list of items on one menu line is SEVERAL SEPARATE DISHES, one
+  per segment, each emitted as its own entry (same category, same position in
+  menu order) -- UNLESS the "&" instead joins two words that only make sense
+  together as a single dish's name. Test each segment on its own: if it reads
+  as a complete, independently-orderable dish by itself, split it out.
+    "Choley & Bread Kulcha (Amritsari Black Chole) & Biryani & Raita (Add Paneer)"
+    -> FOUR dishes: "Choley", "Bread Kulcha", "Biryani", "Raita" (every
+    parenthetical is dropped entirely regardless of splitting -- see below).
+    "Broccoli & Roasted Almond Soup with Garlic Stick" -> ONE dish, because
+    "Broccoli" alone and "Roasted Almond Soup with Garlic Stick" alone are not
+    each a complete dish -- the "&" is part of this one soup's name. Keep its
+    "&" as written.
 - name: the dish name, Title Cased, with any parenthetical detail REMOVED and
-  any trailing serving phrase REMOVED (see sub). Keep "&" as written.
-- sub: the detail pulled off the name. Either
-    - a parenthetical: "(Focaccia & Garlic bread)" -> "Focaccia | Garlic Bread", or
-    - a serving phrase, which must be CUT from the name:
+  any trailing serving phrase REMOVED (see sub).
+- Every parenthetical is DROPPED ENTIRELY, on every dish, never kept as sub:
+  "Mix Fruit Tetra Pack (Real or Tropicana brand only)" -> name "Mix Fruit
+  Tetra Pack", sub "". "Raita (Add Paneer)" -> name "Raita", sub "".
+- sub: ONLY a trailing serving phrase, which must be CUT from the name:
       "Blueberry Panncotta Served in Shot Glass" -> name "Blueberry Panncotta",
       sub "Served in Shot Glass".
       "Chocolate mousse in shot glass" -> name "Chocolate Mousse",
       sub "Served in Shot Glass".
-  Empty string when there is none.
+  Empty string when there is none, including every parenthetical case above.
 - category: which course the dish belongs to, as one of EXACTLY these labels:
   "Welcome Drink", "Soup", "Starters", "Main Course", "Accompaniments", "Desserts".
   Map the message's wording onto that list: "Welcome Drinks" -> "Welcome Drink",
   "Starters on Buffet" -> "Starters", "Main Course on Buffet" -> "Main Course",
   "Deserts" -> "Desserts". Items after a heading inherit it until the next heading.
   If a dish fits none of them, use the closest one; never invent a new label.
-- diet: "N" ONLY when the dish NAME ITSELF names meat, fish, poultry or seafood.
-  Chicken, mutton, lamb, prawn, fish, crab, bacon and ham in the name are "N".
+- diet: "N" ONLY when the dish NAME ITSELF names meat, fish, poultry, seafood or egg.
+  Chicken, mutton, lamb, prawn, fish, crab, bacon, ham, egg, anda and omelette
+  in the name are "N".
   Everything else is "V". This is the single most important rule, so apply it
   literally:
     * A dish a restaurant MIGHT make with a hidden animal ingredient is still
@@ -421,9 +444,12 @@ Rules:
     * Read the whole menu before deciding. An all-vegetarian menu almost never
       contains one hidden non-veg dish, so a borderline name on such a menu is
       "V".
-    * EGG IS VEGETARIAN here, as it is on an Indian catering menu: egg in
-      pasta, ravioli, noodles, mayonnaise, cake or custard does NOT make a
-      dish "N". So "Pumpkin Ravioli with Sage Butter Cream Sauce" is "V".
+    * EGG NAMED IN THE DISH makes it "N": "Egg Curry", "Masala Omelette",
+      "Egg Fried Rice", "Egg Bhurji" and "Anda Curry" are all "N". Egg that is
+      only HIDDEN inside a dish does NOT: pasta, ravioli, noodles, mayonnaise,
+      cake or custard whose name does not say egg stay "V", so "Pumpkin Ravioli
+      with Sage Butter Cream Sauce" is "V". "Eggless" and "Eggplant" are not
+      egg: "Eggless Chocolate Cake" and "Eggplant Parmigiana" are "V".
   Marking a vegetarian dish "N" is the worst error you can make: it puts a red
   NON-VEG mark on a veg buffet table. When unsure, choose "V" and flag it.
 - dietConfidence: "high" when the dish name makes the diet obvious, "low" when
@@ -478,16 +504,65 @@ const ORDER_SCHEMA = {
   additionalProperties: false,
 };
 
-/* Ask the model to read the order. Returns the shape the renderer expects:
-   { date, venue, pax, reportTime, startTime,
-     dishes: [{ course, name, note, veg, unsure }] }. */
-async function parseOrder(text) {
+/* Reads an OpenRouter chat-completion SSE body and returns the reassembled
+   message.content string, calling onProgress(chunkCount) on every "data: "
+   event so the caller can drive a progress indicator off real network
+   activity instead of a blind wait. */
+async function readSseContent(body, onProgress) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let content = '';
+  let chunks = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // last line may be a partial event; keep it for next read
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === '[DONE]') continue;
+
+      let event;
+      try {
+        event = JSON.parse(data);
+      } catch {
+        continue; // a stray/partial SSE line; skip rather than fail the whole parse
+      }
+
+      const delta = event?.choices?.[0]?.delta?.content;
+      if (delta) {
+        content += delta;
+        chunks += 1;
+        onProgress?.(chunks);
+      }
+    }
+  }
+
+  return content;
+}
+
+/* Ask the model to read the order, streamed over SSE so onProgress can report
+   real incremental chunks as they arrive rather than one blocking wait.
+   A chat-completion stream never states its own final length up front (no
+   API exposes that), so onProgress is fed raw chunk events, not a percent —
+   the caller (render()) turns that into the smoothed 0-100% shown to the
+   user. Returns the shape the renderer expects: { date, venue, pax,
+   reportTime, startTime, dishes: [{ course, name, note, veg, unsure }] }. */
+async function parseOrder(text, onProgress) {
   const res = await fetch(PARSE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: MODEL,
       temperature: 0,
+      stream: true,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: 'Extract the order details from this message:\n\n' + text },
@@ -508,8 +583,7 @@ async function parseOrder(text) {
     throw new Error('Parsing failed (' + res.status + '). ' + detail.slice(0, 300));
   }
 
-  const body = await res.json();
-  const content = body?.choices?.[0]?.message?.content;
+  const content = await readSseContent(res.body, onProgress);
   if (!content) throw new Error('OpenRouter returned no content.');
 
   let parsed;
@@ -652,6 +726,9 @@ const printBtn = document.getElementById('printBtn');
 const generateBtn = document.getElementById('generateBtn');
 const spinner = document.getElementById('spinner');
 const generateLabel = document.getElementById('generateLabel');
+const progressWrap = document.getElementById('progressWrap');
+const progressBar = document.getElementById('progressBar');
+const progressLabel = document.getElementById('progressLabel');
 
 /* the button doubles as the progress indicator, first while the order is
    read and then while the server prints the PDF */
@@ -660,6 +737,50 @@ function setBusy(on, label) {
   generateBtn.disabled = on;
   printBtn.disabled = on;
   generateLabel.textContent = on ? (label || 'Generating…') : 'Generate cards';
+  if (!on) hideProgress();
+}
+
+/* ---------- progress bar ----------
+   No chat-completion API states its own final output length up front, so a
+   literal "63% of the model's answer is done" number would be fiction. This
+   instead shows a bar that is honestly driven by real events (every SSE
+   chunk that actually arrived moves it), staged so it reads as smooth
+   0->100% rather than a blind spinner:
+     0-15%   request sent, waiting for the first token
+     15-90%  streaming — each chunk nudges the bar some fraction of the way
+             to 90%, so it keeps moving but can never reach 90% on its own
+     90-100% parsing the reply and building the cards, once the stream ends */
+const PROGRESS_STREAM_CEILING = 90;
+let progressPct = 0;
+
+function showProgress(label) {
+  progressWrap.hidden = false;
+  progressPct = 0;
+  progressBar.style.width = '0%';
+  progressLabel.textContent = label;
+}
+
+function setProgress(pct, label) {
+  progressPct = pct;
+  progressBar.style.width = Math.min(100, Math.max(0, pct)) + '%';
+  if (label) progressLabel.textContent = label;
+}
+
+/* called once per streamed chunk: moves part of the way from where the bar
+   is now to the ceiling, so it keeps crawling forward but visibly slows down
+   rather than parking at 99% — the behaviour Microsoft's progress-bar
+   guidance warns against for genuinely unknown-length work */
+function nudgeProgress(label) {
+  const target = Math.max(progressPct, 15);
+  const next = Math.min(
+    PROGRESS_STREAM_CEILING,
+    Math.max(target, progressPct + (PROGRESS_STREAM_CEILING - progressPct) * 0.08)
+  );
+  setProgress(next, label);
+}
+
+function hideProgress() {
+  progressWrap.hidden = true;
 }
 
 /* Reading the order costs an API call, so it runs on submit rather than on
@@ -684,10 +805,12 @@ async function render(opts = {}) {
   errEl.hidden = true;
   countEl.textContent = 'Reading the order…';
   setBusy(true);
+  showProgress('Sending order to the model…');
+  setProgress(8);
 
   let data;
   try {
-    data = await parseOrder(text);
+    data = await parseOrder(text, () => nudgeProgress('Reading the order…'));
   } catch (err) {
     errEl.hidden = false;
     errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
@@ -699,8 +822,7 @@ async function render(opts = {}) {
     setBusy(false);
     return;
   }
-  busy = false;
-  setBusy(false);
+  setProgress(92, 'Building cards…');
 
   if (!data.dishes.length) {
     errEl.hidden = false;
@@ -709,11 +831,22 @@ async function render(opts = {}) {
     printBtn.hidden = true;
     countEl.textContent = '';
     sheetNote.textContent = '';
+    busy = false;
+    setBusy(false);
     return;
   }
 
   errEl.hidden = true;
   await renderCards(data, opts);
+  setProgress(100, 'Done');
+  busy = false;
+  setBusy(false);
+
+  // download the PDF in the background the moment the preview is up, so it
+  // is already on disk by the time the user goes looking for it — unless
+  // opts.pdf is about to open it in a visible tab anyway (openPdfTab()
+  // downloads it itself once that finishes)
+  if (!opts.preview && !opts.pdf) autoDownloadPdf();
 }
 
 /* Builds the card sheets and drops them into the page — the part of render()
@@ -721,6 +854,10 @@ async function render(opts = {}) {
    preview can call it directly with dummy data on load, instead of forcing
    a parse just to see the current card design. */
 async function renderCards(data, opts = {}) {
+  // kept for openPdfTab(), which has no access to the parsed order itself —
+  // only to the rendered markup — but needs the date/venue for the filename
+  lastOrder = data;
+
   // every card, in print order
   const main = [
     ...data.dishes.map(dishCard),
@@ -908,6 +1045,19 @@ ${head}
 
 let pdfUrl = null;    // the last PDF, revoked before a new one replaces it
 let pdfKey = null;    // the markup that PDF was made from, so a repeat click is free
+let lastOrder = null; // the parsed order, for the downloaded file's name
+
+/* "Soul Chef - <venue>, <date>.pdf", trimmed to what is actually known —
+   falls back to a plain default when the order carries neither. Strips
+   characters Windows/macOS file systems reject so the name always saves. */
+function pdfFileName() {
+  const parts = [lastOrder?.venue, lastOrder?.date].filter(Boolean);
+  const label = parts.length ? parts.join(', ') : 'Dish Cards';
+  return ('Soul Chef - ' + label)
+    .replace(/[\\/:*?"<>|]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() + '.pdf';
+}
 
 /* what the placeholder tab shows while the PDF is still being made, so the
    tab is never a blank white page the user wonders about */
@@ -917,25 +1067,30 @@ const PDF_WAITING_DOC =
   'font:14px system-ui,sans-serif;color:#2F2A24;background:#FBF6EC">' +
   '<p>Making the PDF…</p>';
 
-async function openPdfTab() {
+/* triggers a real save-to-disk under a proper name, in addition to the
+   preview tab — a blob: URL alone downloads as a hash-named file, since the
+   browser has no filename to go on without this */
+function downloadPdf(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = pdfFileName();
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/* Renders the current sheets to a PDF blob URL and caches it, reusing the
+   cached one when the sheets have not changed since. Shared by the visible
+   "Open PDF" flow and the silent auto-download that fires as soon as the
+   preview is shown — both just need the blob URL, not a tab. */
+let pdfPromise = null; // in-flight render, so a second caller awaits the same request instead of starting another
+async function buildPdf() {
   const html = printableDocument();
 
-  // Open the tab FIRST, inside the click, for two reasons: the tab appears at
-  // once instead of after the render, and window.open survives the popup
-  // blocker here, which it would not after an await.
-  const tab = window.open('', '_blank');
-  if (tab) {
-    try { tab.document.write(PDF_WAITING_DOC); tab.document.close(); } catch {}
-  }
+  if (pdfUrl && pdfKey === html) return pdfUrl;
+  if (pdfPromise) return pdfPromise;
 
-  // the same sheets print to the same PDF, so a second click reuses it
-  if (pdfUrl && pdfKey === html) {
-    if (tab) tab.location.replace(pdfUrl);
-    return;
-  }
-
-  setBusy(true, 'Making the PDF…');
-  try {
+  pdfPromise = (async () => {
     const res = await fetch(API_BASE + '/api/pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -945,20 +1100,50 @@ async function openPdfTab() {
       const detail = await res.text().catch(() => '');
       throw new Error(detail.slice(0, 300) || ('The server could not make the PDF (' + res.status + ').'));
     }
-
-    // a blob URL, so the tab shows the PDF itself rather than re-posting
     if (pdfUrl) URL.revokeObjectURL(pdfUrl);
     pdfUrl = URL.createObjectURL(await res.blob());
     pdfKey = html;
+    return pdfUrl;
+  })();
 
+  try {
+    return await pdfPromise;
+  } finally {
+    pdfPromise = null;
+  }
+}
+
+/* fires right after the preview renders, so the PDF lands on disk with no
+   extra click — failures are silent here (no tab, no sidebar error) since
+   the user never asked for this one directly; "Open PDF" still surfaces
+   any real problem if they go looking for the file */
+async function autoDownloadPdf() {
+  try {
+    downloadPdf(await buildPdf());
+  } catch {}
+}
+
+async function openPdfTab() {
+  // Open the tab FIRST, inside the click, for two reasons: the tab appears at
+  // once instead of after the render, and window.open survives the popup
+  // blocker here, which it would not after an await.
+  const tab = window.open('', '_blank');
+  if (tab) {
+    try { tab.document.write(PDF_WAITING_DOC); tab.document.close(); } catch {}
+  }
+
+  setBusy(true, 'Making the PDF…');
+  try {
+    const url = await buildPdf();
     if (tab) {
       // replace, not assign, so the placeholder leaves no history entry
-      tab.location.replace(pdfUrl);
+      tab.location.replace(url);
     } else {
       errEl.hidden = false;
       errEl.className = 'mt-2 rounded-md bg-amber-50 px-2 py-1.5 text-[10px] text-amber-800 ring-1 ring-amber-200';
       errEl.textContent = 'Allow pop-ups for this site to open the PDF in a new tab, then press Open PDF.';
     }
+    downloadPdf(url);
   } catch (err) {
     // the placeholder tab would sit on "Making the PDF…" forever, so say what
     // went wrong there too rather than only in the sidebar

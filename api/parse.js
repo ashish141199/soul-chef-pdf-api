@@ -48,6 +48,17 @@ export default async function handler(req, res) {
       body: JSON.stringify(payload),
     });
 
+    // streamed requests get OpenRouter's SSE bytes piped straight through, so
+    // the browser can show real progress as the model writes its reply
+    if (payload.stream && upstream.ok && upstream.body) {
+      res.status(upstream.status);
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      for await (const chunk of upstream.body) res.write(chunk);
+      res.end();
+      return;
+    }
+
     const text = await upstream.text();
     res.status(upstream.status);
     res.setHeader('Content-Type', 'application/json; charset=utf-8');

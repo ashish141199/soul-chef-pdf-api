@@ -88,6 +88,18 @@ async function handleParse(req, res) {
       body: JSON.stringify(payload),
     });
 
+    // streamed requests get OpenRouter's SSE bytes piped straight through, so
+    // the browser can show real progress as the model writes its reply
+    if (payload.stream && upstream.ok && upstream.body) {
+      res.writeHead(upstream.status, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache',
+      });
+      for await (const chunk of upstream.body) res.write(chunk);
+      res.end();
+      return;
+    }
+
     const text = await upstream.text();
     res.writeHead(upstream.status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(text);

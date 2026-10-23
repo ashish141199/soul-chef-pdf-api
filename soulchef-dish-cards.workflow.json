@@ -4,9 +4,20 @@
     {
       "parameters": {
         "formTitle": "Soul Chef Dish Cards",
-        "formDescription": "Paste the order message exactly as received. The menu, event date and venue are read automatically.",
+        "formDescription": "Paste the order message exactly as received. The menu, event date and venue are read automatically. Duplicate dishes are printed only once unless permitted.",
         "formFields": {
           "values": [
+            {
+              "fieldLabel": "Duplicate Dishes",
+              "fieldType": "checkbox",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Permit duplicate dishes (each occurrence is printed as a separate card)"
+                  }
+                ]
+              }
+            },
             {
               "fieldLabel": "Order",
               "fieldType": "textarea",
@@ -17,8 +28,8 @@
         },
         "responseMode": "lastNode",
         "options": {
-          "path": "generate-order",
-          "customCss": ":root { --container-width: 95%; --font-size-input: 15px; --padding-card: 32px; }\n.container { max-width: 1100px; }\ntextarea { min-height: 50vh; }"
+          "path": "generate-menu-cards",
+          "customCss": ":root { --container-width: 95%; --font-size-input: 15px; --padding-card: 32px; }\n.container { max-width: 1100px; }\ntextarea { min-height: 50vh; }\ninput[type=\"checkbox\"] { -webkit-appearance: none; appearance: none; width: 44px; height: 24px; margin: 0 10px 0 0; border: none !important; border-radius: 12px; background: #c9c2b6 !important; background-image: none !important; box-shadow: none !important; outline: none; position: relative; cursor: pointer; flex-shrink: 0; transition: background .2s; }\ninput[type=\"checkbox\"]::before { content: \"\"; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }\ninput[type=\"checkbox\"]::after { content: none !important; display: none !important; }\ninput[type=\"checkbox\"]:checked { background: #A98B4F !important; }\ninput[type=\"checkbox\"]:checked::before { transform: translateX(20px); }\ninput[type=\"checkbox\"]:focus-visible { outline: 2px solid #A98B4F; outline-offset: 2px; }"
         }
       },
       "id": "a1f1c001-0000-4000-8000-000000000001",
@@ -33,7 +44,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// The AI chain returns its JSON under .output when a structured parser is used.\nconst parsed = $json.output || $json;\nlet dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\nparsed.dishes = dishes;\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// api/pdf.js on Vercel builds the card HTML itself from this parsed order\n// JSON — the same shape OpenRouter returns — and renders it with Puppeteer.\n// This keeps one source of truth for the card markup (index.html's own\n// browser flow posts the same shape under { order: ... }).\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards' } }];"
+        "jsCode": "// The AI chain returns its JSON under .output when a structured parser is used.\nconst parsed = $json.output || $json;\nlet dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\n// Egg named in the dish is non-veg, whatever the model said. The word\n// boundary keeps \"Eggless\" and \"Eggplant\" veg.\nconst EGG = /\\b(eggs?|anda|omelett?es?|omelets?)\\b/i;\nfor (const d of dishes) if (EGG.test(d.name)) d.diet = 'N';\n\n// Unless the form permits duplicates, keep only the first card per dish name.\nconst allowDuplicates = ($('On form submission').first().json['Duplicate Dishes'] || []).length > 0;\nif (!allowDuplicates) {\n  const seen = new Set();\n  dishes = dishes.filter(d => {\n    const key = d.name.trim().toLowerCase().replace(/\\s+/g, ' ');\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\n\nparsed.dishes = dishes;\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// \"Order 5\" -> order_5.pdf; no order number -> order_15_10_2026_12-12PM.pdf (IST).\nconst orderNo = ((parsed.eventName || '').match(/\\d+/) || [])[0];\nconst fileName = (orderNo\n  ? 'order_' + orderNo\n  : 'order_' + DateTime.now().setZone('Asia/Kolkata').toFormat('dd_MM_yyyy_hh-mma')) + '.pdf';\n\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards', fileName, parsedAt: Date.now() } }];"
       },
       "id": "a1f1c001-0000-4000-8000-000000000002",
       "name": "Build replacements",
@@ -46,25 +57,127 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "https://soulchef-pdf-api.vercel.app/api/pdf",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ order: $('Build replacements').item.json.order }) }}",
-        "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          }
-        }
+        "resource": "sandbox",
+        "operation": "create",
+        "template": "soulchef-pdf",
+        "allowInternetAccess": false
       },
-      "id": "a1f1c001-0000-4000-8000-000000000004",
-      "name": "Render PDF",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "id": "a1f1c001-0000-4000-8000-000000000010",
+      "name": "Create sandbox",
+      "type": "@e2b/n8n-nodes-e2b.e2b",
+      "typeVersion": 1,
       "position": [
         880,
+        0
+      ],
+      "credentials": {
+        "e2bApi": {
+          "id": "REPLACE_WITH_YOUR_E2B_CREDENTIAL_ID",
+          "name": "E2B account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "write",
+        "sandboxId": "={{ $json.sandboxId }}",
+        "path": "/home/user/order.json",
+        "content": "={{ JSON.stringify($('Build replacements').item.json.order) }}"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000011",
+      "name": "Write order.json",
+      "type": "@e2b/n8n-nodes-e2b.e2b",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        0
+      ],
+      "credentials": {
+        "e2bApi": {
+          "id": "REPLACE_WITH_YOUR_E2B_CREDENTIAL_ID",
+          "name": "E2B account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "code",
+        "operation": "runCommand",
+        "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}",
+        "command": "=cd /home/user && OUTPUT_PATH=/home/user/{{ $('Build replacements').item.json.fileName }} node render.js",
+        "allowInternetAccess": false,
+        "killAfterRun": false
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000012",
+      "name": "Run render.js",
+      "type": "@e2b/n8n-nodes-e2b.e2b",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        0
+      ],
+      "credentials": {
+        "e2bApi": {
+          "id": "REPLACE_WITH_YOUR_E2B_CREDENTIAL_ID",
+          "name": "E2B account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "operation": "download",
+        "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}",
+        "remotePath": "=/home/user/{{ $('Build replacements').item.json.fileName }}",
+        "binaryPropertyName": "data"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000013",
+      "name": "Download PDF",
+      "type": "@e2b/n8n-nodes-e2b.e2b",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        0
+      ],
+      "credentials": {
+        "e2bApi": {
+          "id": "REPLACE_WITH_YOUR_E2B_CREDENTIAL_ID",
+          "name": "E2B account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "sandbox",
+        "operation": "kill",
+        "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000014",
+      "name": "Kill sandbox",
+      "type": "@e2b/n8n-nodes-e2b.e2b",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        200
+      ],
+      "credentials": {
+        "e2bApi": {
+          "id": "REPLACE_WITH_YOUR_E2B_CREDENTIAL_ID",
+          "name": "E2B account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Name the download after the order, not the sandbox's file path.\nconst item = $input.first();\nitem.binary.data.fileName = $('Build replacements').first().json.fileName;\nitem.binary.data.mimeType = 'application/pdf';\n\n// Where the time went. submittedAt is the form trigger's own stamp; parsedAt\n// is set by Build replacements right after the AI step returns.\nconst sec = (ms) => Math.round(ms / 100) / 10;\nconst now = Date.now();\nconst submittedAt = Date.parse($('On form submission').first().json.submittedAt);\nconst parsedAt = $('Build replacements').first().json.parsedAt;\nconst render = $('Run render.js').first().json;\nconst steps = (String(render.stdout || '').match(/TIMINGS (\\{.*\\})/) || [])[1];\nitem.json.timings = {\n  totalSec: sec(now - submittedAt),\n  aiParseSec: sec(parsedAt - submittedAt),\n  e2bTotalSec: sec(now - parsedAt),\n  renderCommandSec: sec(render.executionTimeMs || 0),\n  renderStepsMs: steps ? JSON.parse(steps) : null,\n};\nconsole.log('Soul Chef timings ' + JSON.stringify(item.json.timings));\nreturn [item];"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000015",
+      "name": "Name PDF",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
         0
       ]
     },
@@ -73,7 +186,7 @@
         "operation": "completion",
         "respondWith": "returnBinary",
         "completionTitle": "Your dish cards are ready",
-        "completionMessage": "={{ 'The PDF is downloading. The sheet is A2 portrait, 16.531 x 23.385 in (42.0 x 59.4 cm); print at 100% on A2. Each card is 7.93 x 5.58 in (20.1 x 14.2 cm), 8 to a sheet - cut along the card edges.' + ($('Build replacements').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Build replacements').item.json.review.join(', ') : '') + '\\n\\n<a href=\"https://automations.autive.io/form/generate-order\" style=\"display:inline-block;margin-top:12px;padding:10px 18px;background:#A98B4F;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;\">Generate another order</a>' }}",
+        "completionMessage": "={{ 'The PDF is downloading. The sheet is A2 portrait, 16.531 x 23.385 in (42.0 x 59.4 cm); print at 100% on A2. Each card is 7.93 x 5.58 in (20.1 x 14.2 cm), 8 to a sheet - cut along the card edges.' + ($('Build replacements').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Build replacements').item.json.review.join(', ') : '') + '\\n\\n<a href=\"https://automations.autive.io/form/generate-menu-cards\" style=\"display:inline-block;margin-top:12px;padding:10px 18px;background:#A98B4F;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;\">Generate another order</a>' }}",
         "inputDataFieldName": "data",
         "options": {
           "customCss": ":root { --container-width: 95%; --padding-card: 32px; }\n.container { max-width: 1100px; }"
@@ -84,7 +197,7 @@
       "type": "n8n-nodes-base.form",
       "typeVersion": 1,
       "position": [
-        1320,
+        1980,
         0
       ],
       "webhookId": "7d2e9f4b-1a3c-4b6d-8e5f-9a0c2e4b6f81"
@@ -96,7 +209,7 @@
         "messages": {
           "messageValues": [
             {
-              "message": "You extract catering order details from free-form WhatsApp text and return JSON only.\n\n- THE TEXT MAY HOLD SEVERAL ORDERS, not just one. A paste often carries a whole\n  forwarded chat: several messages back to back, each starting with a line like\n  \"[10/8, 1:23 PM] +91 75068 67906: *Order 3: 9 October 2026*\" and each with its\n  own \"Menu for the event\" and its own \"*Note* -\" block. Read EVERY message to\n  the very end of the text and merge all of their menus into ONE dishes array,\n  in the order they appear. Never stop after the first message. A six-message\n  paste whose menus hold 30 items must return all 30, not the first message's 4.\n\nRules:\n- dishes: every menu item from every message, in menu order. Ignore non-menu\n  lines (name, phone, pax, location/venue, report/start time). A \"Note\" block\n  ends only ITS OWN message — skip to the next message's header and keep going;\n  it never ends the whole text.\n- The same item may appear more than once, whether repeated within one message\n  or across several messages (an AM and a PM slot both listing \"Tea/Coffee\").\n  Emit EVERY occurrence as its own entry, in the order it appears. Do not\n  deduplicate dishes.\n- A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line\n  with no bullet: \"Welcome Drinks\", \"Soup\", \"Starters on Buffet\", \"Main Course\n  on Buffet\", \"Accompaniments\", \"Deserts\", \"Desserts\". Never emit a dish whose\n  name is just a heading. A heading that is followed by its items on later\n  lines still only sets the category, e.g.\n\n    Soup\n\n    Broccoli & Roasted Almond Soup with Garlic Stick\n\n  is ONE dish, \"Broccoli & Roasted Almond Soup with Garlic Stick\", in the\n  \"Soup\" category — not a dish called \"Soup\".\n- name: the dish name, Title Cased, with any parenthetical detail REMOVED and\n  any trailing serving phrase REMOVED (see sub). Keep \"&\" as written.\n- sub: the detail pulled off the name. Either\n    - a parenthetical: \"(Focaccia & Garlic bread)\" -> \"Focaccia | Garlic Bread\", or\n    - a serving phrase, which must be CUT from the name:\n      \"Blueberry Panncotta Served in Shot Glass\" -> name \"Blueberry Panncotta\",\n      sub \"Served in Shot Glass\".\n      \"Chocolate mousse in shot glass\" -> name \"Chocolate Mousse\",\n      sub \"Served in Shot Glass\".\n  Empty string when there is none.\n- category: which course the dish belongs to, as one of EXACTLY these labels:\n  \"Welcome Drink\", \"Soup\", \"Starters\", \"Main Course\", \"Accompaniments\", \"Desserts\".\n  Map the message's wording onto that list: \"Welcome Drinks\" -> \"Welcome Drink\",\n  \"Starters on Buffet\" -> \"Starters\", \"Main Course on Buffet\" -> \"Main Course\",\n  \"Deserts\" -> \"Desserts\". Items after a heading inherit it until the next heading.\n  If a dish fits none of them, use the closest one; never invent a new label.\n- diet: \"N\" ONLY when the dish NAME ITSELF names meat, fish, poultry or seafood.\n  Chicken, mutton, lamb, prawn, fish, crab, bacon and ham in the name are \"N\".\n  Everything else is \"V\". This is the single most important rule, so apply it\n  literally:\n    * A dish a restaurant MIGHT make with a hidden animal ingredient is still\n      \"V\" when its name does not say so. \"Pad Thai Noodles\" is \"V\", not \"N\" —\n      fish sauce is not in the name. Likewise \"Caesar Salad\" (anchovy),\n      \"Kimchi Fried Rice\" (shrimp paste), \"Panna Cotta\" (gelatin): all \"V\".\n      Record the doubt in dietConfidence, NEVER in diet.\n    * Read the whole menu before deciding. An all-vegetarian menu almost never\n      contains one hidden non-veg dish, so a borderline name on such a menu is\n      \"V\".\n    * EGG IS VEGETARIAN here, as it is on an Indian catering menu: egg in\n      pasta, ravioli, noodles, mayonnaise, cake or custard does NOT make a\n      dish \"N\". So \"Pumpkin Ravioli with Sage Butter Cream Sauce\" is \"V\".\n  Marking a vegetarian dish \"N\" is the worst error you can make: it puts a red\n  NON-VEG mark on a veg buffet table. When unsure, choose \"V\" and flag it.\n- dietConfidence: \"high\" when the dish name makes the diet obvious, \"low\" when\n  a hidden animal ingredient is plausible even though the name does not say so\n  (Caesar Salad may contain anchovy; a mousse or panna cotta may contain\n  gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or\n  shrimp paste). \"low\" is how you express doubt — the diet field stays \"V\".\nThe remaining fields describe the event as a whole, not a single dish. When the\ntext holds several messages, take each one from the FIRST message that has it.\n- eventDate: the date as written, e.g. \"28 September 2026\". Empty string if absent.\n- venue: the place, from a \"Venue:\" or \"Location:\" line. Shorten it for a card:\n  drop a leading floor number and turn \"Birla Centurion-Worli\" into\n  \"Birla Centurion, Worli\". If the line is only a URL (e.g. a Google Maps link)\n  with no readable place name, return an empty string.\n- pax: the guest count, from a line like \"No. of pax:\", \"No of pax:\" or \"Pax:\".\n  Keep any bracketed note, upper case, e.g. \"38 pax (2 Jain)\" -> \"38 PAX · 2 JAIN\",\n  and \"32\" -> \"32 PAX\". Empty string if absent.\n- reportTime: the crew's reporting time, from a \"Report time:\" line, upper case\n  and tidied, e.g. \"10:00 am\" -> \"10:00 AM\", \"10 am\" -> \"10 AM\". Empty string if absent.\n- startTime: the event start time, from a \"Start time:\" line, same formatting.\n  Empty string if absent.\n- eventName: a short label for the order, e.g. \"Order 5\". Empty string if absent.\n\nReturn ONLY the JSON object. No prose, no code fences."
+              "message": "You extract catering order details from free-form WhatsApp text and return JSON only.\n\n- THE TEXT MAY HOLD SEVERAL ORDERS, not just one. A paste often carries a whole\n  forwarded chat: several messages back to back, each starting with a line like\n  \"[10/8, 1:23 PM] +91 75068 67906: *Order 3: 9 October 2026*\" and each with its\n  own \"Menu for the event\" and its own \"*Note* -\" block. Read EVERY message to\n  the very end of the text and merge all of their menus into ONE dishes array,\n  in the order they appear. Never stop after the first message. A six-message\n  paste whose menus hold 30 items must return all 30, not the first message's 4.\n\nRules:\n- dishes: every menu item from every message, in menu order. Ignore non-menu\n  lines (name, phone, pax, location/venue, report/start time). A \"Note\" block\n  ends only ITS OWN message — skip to the next message's header and keep going;\n  it never ends the whole text.\n- The same item may appear more than once, whether repeated within one message\n  or across several messages (an AM and a PM slot both listing \"Tea/Coffee\").\n  Emit EVERY occurrence as its own entry, in the order it appears. Do not\n  deduplicate dishes.\n- A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line\n  with no bullet: \"Welcome Drinks\", \"Soup\", \"Starters on Buffet\", \"Main Course\n  on Buffet\", \"Accompaniments\", \"Deserts\", \"Desserts\". Never emit a dish whose\n  name is just a heading. A heading that is followed by its items on later\n  lines still only sets the category, e.g.\n\n    Soup\n\n    Broccoli & Roasted Almond Soup with Garlic Stick\n\n  is ONE dish, \"Broccoli & Roasted Almond Soup with Garlic Stick\", in the\n  \"Soup\" category — not a dish called \"Soup\".\n- name: the dish name, Title Cased, with any parenthetical detail REMOVED and\n  any trailing serving phrase REMOVED (see sub). Keep \"&\" as written.\n- sub: the detail pulled off the name. Either\n    - a parenthetical: \"(Focaccia & Garlic bread)\" -> \"Focaccia | Garlic Bread\", or\n    - a serving phrase, which must be CUT from the name:\n      \"Blueberry Panncotta Served in Shot Glass\" -> name \"Blueberry Panncotta\",\n      sub \"Served in Shot Glass\".\n      \"Chocolate mousse in shot glass\" -> name \"Chocolate Mousse\",\n      sub \"Served in Shot Glass\".\n  Empty string when there is none.\n- category: which course the dish belongs to, as one of EXACTLY these labels:\n  \"Welcome Drink\", \"Soup\", \"Starters\", \"Main Course\", \"Accompaniments\", \"Desserts\".\n  Map the message's wording onto that list: \"Welcome Drinks\" -> \"Welcome Drink\",\n  \"Starters on Buffet\" -> \"Starters\", \"Main Course on Buffet\" -> \"Main Course\",\n  \"Deserts\" -> \"Desserts\". Items after a heading inherit it until the next heading.\n  If a dish fits none of them, use the closest one; never invent a new label.\n- diet: \"N\" ONLY when the dish NAME ITSELF names meat, fish, poultry, seafood or egg.\n  Chicken, mutton, lamb, prawn, fish, crab, bacon, ham, egg, anda and omelette\n  in the name are \"N\".\n  Everything else is \"V\". This is the single most important rule, so apply it\n  literally:\n    * A dish a restaurant MIGHT make with a hidden animal ingredient is still\n      \"V\" when its name does not say so. \"Pad Thai Noodles\" is \"V\", not \"N\" —\n      fish sauce is not in the name. Likewise \"Caesar Salad\" (anchovy),\n      \"Kimchi Fried Rice\" (shrimp paste), \"Panna Cotta\" (gelatin): all \"V\".\n      Record the doubt in dietConfidence, NEVER in diet.\n    * Read the whole menu before deciding. An all-vegetarian menu almost never\n      contains one hidden non-veg dish, so a borderline name on such a menu is\n      \"V\".\n    * EGG NAMED IN THE DISH makes it \"N\": \"Egg Curry\", \"Masala Omelette\",\n      \"Egg Fried Rice\", \"Egg Bhurji\" and \"Anda Curry\" are all \"N\". Egg that is\n      only HIDDEN inside a dish does NOT: pasta, ravioli, noodles, mayonnaise,\n      cake or custard whose name does not say egg stay \"V\", so \"Pumpkin Ravioli\n      with Sage Butter Cream Sauce\" is \"V\". \"Eggless\" and \"Eggplant\" are not\n      egg: \"Eggless Chocolate Cake\" and \"Eggplant Parmigiana\" are \"V\".\n  Marking a vegetarian dish \"N\" is the worst error you can make: it puts a red\n  NON-VEG mark on a veg buffet table. When unsure, choose \"V\" and flag it.\n- dietConfidence: \"high\" when the dish name makes the diet obvious, \"low\" when\n  a hidden animal ingredient is plausible even though the name does not say so\n  (Caesar Salad may contain anchovy; a mousse or panna cotta may contain\n  gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or\n  shrimp paste). \"low\" is how you express doubt — the diet field stays \"V\".\nThe remaining fields describe the event as a whole, not a single dish. When the\ntext holds several messages, take each one from the FIRST message that has it.\n- eventDate: the date as written, e.g. \"28 September 2026\". Empty string if absent.\n- venue: the place, from a \"Venue:\" or \"Location:\" line. Shorten it for a card:\n  drop a leading floor number and turn \"Birla Centurion-Worli\" into\n  \"Birla Centurion, Worli\". If the line is only a URL (e.g. a Google Maps link)\n  with no readable place name, return an empty string.\n- pax: the guest count, from a line like \"No. of pax:\", \"No of pax:\" or \"Pax:\".\n  Keep any bracketed note, upper case, e.g. \"38 pax (2 Jain)\" -> \"38 PAX · 2 JAIN\",\n  and \"32\" -> \"32 PAX\". Empty string if absent.\n- reportTime: the crew's reporting time, from a \"Report time:\" line, upper case\n  and tidied, e.g. \"10:00 am\" -> \"10:00 AM\", \"10 am\" -> \"10 AM\". Empty string if absent.\n- startTime: the event start time, from a \"Start time:\" line, same formatting.\n  Empty string if absent.\n- eventName: a short label for the order, e.g. \"Order 5\". Empty string if absent.\n\nReturn ONLY the JSON object. No prose, no code fences."
             }
           ]
         },
@@ -158,14 +271,63 @@
       "main": [
         [
           {
-            "node": "Render PDF",
+            "node": "Create sandbox",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Render PDF": {
+    "Create sandbox": {
+      "main": [
+        [
+          {
+            "node": "Write order.json",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write order.json": {
+      "main": [
+        [
+          {
+            "node": "Run render.js",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run render.js": {
+      "main": [
+        [
+          {
+            "node": "Download PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download PDF": {
+      "main": [
+        [
+          {
+            "node": "Kill sandbox",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Name PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Name PDF": {
       "main": [
         [
           {
