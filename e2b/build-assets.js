@@ -8,9 +8,9 @@
  *     inlined as a data: URI
  */
 import fs from 'fs';
-import { buildDocument, normalizeOrder, TAILWIND_THEME } from './render.js';
+import { buildDocument, buildOnepageDocument, normalizeOrder, TAILWIND_THEME } from './render.js';
 
-const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&family=Caveat:wght@500&family=Poppins:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap';
+const FONTS_URL = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Jost:wght@300;400;500;600&family=Agbalumo&family=Poppins:wght@400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap';
 
 // Google only serves woff2 to user agents it recognises as a modern browser.
 const BROWSER_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36';
@@ -33,10 +33,20 @@ const SAMPLE_ORDER = {
   ],
 };
 
+// a sample onepage poster too, so Tailwind also scans font-script, the
+// item/title uppercase classes, etc. — the same reason the dish-card sample
+// above exists: classes built at render time are invisible to Tailwind
+// unless something on disk actually contains them
+const SAMPLE_ONEPAGE = {
+  title: 'Sample Counter',
+  items: [{ name: 'Sample Item', desc: 'Sample description line' }],
+};
+
 fs.writeFileSync('tailwind-sample.html', buildDocument(normalizeOrder(SAMPLE_ORDER)));
+fs.writeFileSync('tailwind-sample-onepage.html', buildOnepageDocument(SAMPLE_ONEPAGE));
 fs.writeFileSync('tailwind.input.css', '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n');
 fs.writeFileSync('tailwind.config.cjs', 'module.exports = ' + JSON.stringify({
-  content: ['./tailwind-sample.html', './render.js'],
+  content: ['./tailwind-sample.html', './tailwind-sample-onepage.html', './render.js'],
   theme: { extend: TAILWIND_THEME },
 }, null, 2) + ';\n');
 

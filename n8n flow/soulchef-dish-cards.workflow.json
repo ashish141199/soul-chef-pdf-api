@@ -8,6 +8,17 @@
         "formFields": {
           "values": [
             {
+              "fieldLabel": "Mode",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  { "option": "Dish Cards" },
+                  { "option": "Onepage Poster" }
+                ]
+              },
+              "requiredField": true
+            },
+            {
               "fieldLabel": "Duplicate Dishes",
               "fieldType": "checkbox",
               "fieldOptions": {
@@ -21,7 +32,8 @@
             {
               "fieldLabel": "Order",
               "fieldType": "textarea",
-              "placeholder": "Order 5: 28 September 2026\n\nName: ...\n\nVenue: ...\n\nMenu for the event:\n\nWelcome Drinks\n• Guava Lime cooler\n...",
+              "placeholder": "Order 5: 28 September 2026\n\nName: ...\n\nVenue: ...\n\nMenu for the event:\n\nWelcome Drinks\n\u2022 Guava Lime cooler\n...\n\nFor an Onepage Poster, instead paste:\nCounter Title\n\nItem Name\nOptional description line\n\nNext Item Name",
+              "fieldValue": "vada\n\nsamosa\n\nChiken Biryani\n\nEgg Roll",
               "requiredField": true
             }
           ]
@@ -29,7 +41,7 @@
         "responseMode": "lastNode",
         "options": {
           "path": "generate-menu-cards",
-          "customCss": "@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');\n\n:root { --container-width: 70%; --font-size-input: 15px; --padding-card: 32px; }\n.container { max-width: 700px; }\n\nbody, .container {\n  background: #F3EBDD !important;\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #2F2A24 !important;\n}\n\n.n8n-form, form, .form-wrapper, .container > div {\n  background: #ffffff !important;\n  border-radius: 12px !important;\n  box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;\n  border: 1px solid #e7e0d2 !important;\n}\n\nh1, h2, .form-title, [class*=\"title\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #2F2A24 !important;\n  font-weight: 600 !important;\n}\n\np, label, [class*=\"description\"], [class*=\"label\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #57503f !important;\n}\n\ntextarea { min-height: 220px; }\ntextarea, input[type=\"text\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  border: 1px solid #d8d0bf !important;\n  border-radius: 8px !important;\n}\ntextarea:focus, input[type=\"text\"]:focus {\n  outline: none !important;\n  border-color: #A98B4F !important;\n  box-shadow: 0 0 0 2px rgba(169,139,79,0.3) !important;\n}\n\ninput[type=\"checkbox\"] { -webkit-appearance: none; appearance: none; width: 44px; height: 24px; margin: 0 10px 0 0; border: none !important; border-radius: 12px; background: #c9c2b6 !important; background-image: none !important; box-shadow: none !important; outline: none; position: relative; cursor: pointer; flex-shrink: 0; transition: background .2s; }\ninput[type=\"checkbox\"]::before { content: \"\"; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }\ninput[type=\"checkbox\"]::after { content: none !important; display: none !important; }\ninput[type=\"checkbox\"]:checked { background: #A98B4F !important; }\ninput[type=\"checkbox\"]:checked::before { transform: translateX(20px); }\ninput[type=\"checkbox\"]:focus-visible { outline: 2px solid #A98B4F; outline-offset: 2px; }\n\nbutton[type=\"submit\"], .btn-submit, [class*=\"submit\"] {\n  background: #A98B4F !important;\n  border: none !important;\n  border-radius: 8px !important;\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  font-weight: 600 !important;\n  transition: filter .15s !important;\n}\nbutton[type=\"submit\"]:hover, .btn-submit:hover, [class*=\"submit\"]:hover {\n  filter: brightness(1.1) !important;\n}\n\n[class*=\"poweredBy\"], [class*=\"powered-by\"], a[href*=\"n8n.io\"] {\n  color: #a89a7f !important;\n}"
+          "customCss": "@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');\n\n:root { --container-width: 70%; --font-size-input: 15px; --padding-card: 32px; }\n.container { max-width: 700px; }\n\nbody, .container {\n  background: #F3EBDD !important;\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #2F2A24 !important;\n}\n\n.n8n-form, form, .form-wrapper, .container > div {\n  background: #ffffff !important;\n  border-radius: 12px !important;\n  box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;\n  border: 1px solid #e7e0d2 !important;\n}\n\nh1, h2, .form-title, [class*=\"title\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #2F2A24 !important;\n  font-weight: 600 !important;\n}\n\np, label, [class*=\"description\"], [class*=\"label\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #57503f !important;\n}\n\ntextarea { min-height: 220px; }\ntextarea, input[type=\"text\"], select {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  border: 1px solid #d8d0bf !important;\n  border-radius: 8px !important;\n}\ntextarea:focus, input[type=\"text\"]:focus, select:focus {\n  outline: none !important;\n  border-color: #A98B4F !important;\n  box-shadow: 0 0 0 2px rgba(169,139,79,0.3) !important;\n}\n\ninput[type=\"checkbox\"] { -webkit-appearance: none; appearance: none; width: 44px; height: 24px; margin: 0 10px 0 0; border: none !important; border-radius: 12px; background: #c9c2b6 !important; background-image: none !important; box-shadow: none !important; outline: none; position: relative; cursor: pointer; flex-shrink: 0; transition: background .2s; }\ninput[type=\"checkbox\"]::before { content: \"\"; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform .2s; }\ninput[type=\"checkbox\"]::after { content: none !important; display: none !important; }\ninput[type=\"checkbox\"]:checked { background: #A98B4F !important; }\ninput[type=\"checkbox\"]:checked::before { transform: translateX(20px); }\ninput[type=\"checkbox\"]:focus-visible { outline: 2px solid #A98B4F; outline-offset: 2px; }\n\nbutton[type=\"submit\"], .btn-submit, [class*=\"submit\"] {\n  background: #A98B4F !important;\n  border: none !important;\n  border-radius: 8px !important;\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  font-weight: 600 !important;\n  transition: filter .15s !important;\n}\nbutton[type=\"submit\"]:hover, .btn-submit:hover, [class*=\"submit\"]:hover {\n  filter: brightness(1.1) !important;\n}\n\n[class*=\"poweredBy\"], [class*=\"powered-by\"], a[href*=\"n8n.io\"] {\n  color: #a89a7f !important;\n}"
         }
       },
       "id": "a1f1c001-0000-4000-8000-000000000001",
@@ -44,11 +56,57 @@
     },
     {
       "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "mode-split",
+              "leftValue": "={{ $json.Mode }}",
+              "rightValue": "Onepage Poster",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000030",
+      "name": "Which mode?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "True (top output) = Onepage Poster, skips the AI parse entirely and goes straight to local text parsing, same as app.js's Generate button does when Onepage mode is toggled on. False (bottom output) = Dish Cards, the existing AI-parsed flow."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Onepage mode has NO AI call, on n8n or the web app \u2014 this is the same\n// first-block-is-title / blank-line-separated-items parsing app.js's\n// parseOnepage() does client-side. Ported verbatim; keep both in step.\nconst text = $json.Order || '';\n\nfunction titleCase(str) {\n  return str.replace(/\\w\\S*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());\n}\n\nconst blocks = text.split(/\\n\\s*\\n/).map((b) => b.trim()).filter(Boolean);\nif (!blocks.length) throw new Error('Paste a counter title, then one blank line, then each item.');\n\nconst title = titleCase(blocks[0].split('\\n')[0].trim());\nconst items = blocks.slice(1).map((block) => {\n  const lines = block.split('\\n').map((l) => l.trim()).filter(Boolean);\n  return { name: titleCase(lines[0] || ''), desc: lines.slice(1).join(' ') };\n}).filter((item) => item.name);\n\nif (!title && !items.length) {\n  throw new Error('Paste a counter title, then one blank line, then each item.');\n}\n\n// DateTime.now()... matches Build replacements' own filename pattern, so\n// both branches produce a sensibly-named download regardless of mode.\nconst fileName = 'onepage_' + DateTime.now().setZone('Asia/Kolkata').toFormat('dd_MM_yyyy_hh-mma') + '.pdf';\n\nreturn [{\n  json: {\n    order: { onepage: { title, items } },\n    count: items.length,\n    review: [],\n    title: title || 'Onepage Poster',\n    fileName,\n    parsedAt: Date.now(),\n  },\n}];"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000031",
+      "name": "Build onepage",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        160
+      ]
+    },
+    {
+      "parameters": {
         "method": "POST",
         "url": "https://soulchef-pdf-api.vercel.app/api/parse",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  model: 'openai/gpt-6-luna',\n  temperature: 0,\n  messages: [\n    { role: 'system', content: $('Set system prompt').first().json.systemPrompt },\n    { role: 'user', content: 'Extract the order details from this message:\\n\\n' + $json.Order }\n  ],\n  response_format: {\n    type: 'json_schema',\n    json_schema: {\n      name: 'order',\n      strict: true,\n      schema: {\n        type: 'object',\n        properties: {\n          eventName: { type: 'string' },\n          eventDate: { type: 'string' },\n          venue: { type: 'string' },\n          pax: { type: 'string' },\n          reportTime: { type: 'string' },\n          startTime: { type: 'string' },\n          dishes: {\n            type: 'array',\n            items: {\n              type: 'object',\n              properties: {\n                name: { type: 'string' },\n                sub: { type: 'string' },\n                category: { type: 'string' },\n                diet: { type: 'string', enum: ['V', 'N'] },\n                dietConfidence: { type: 'string', enum: ['high', 'low'] }\n              },\n              required: ['name', 'sub', 'category', 'diet', 'dietConfidence'],\n              additionalProperties: false\n            }\n          }\n        },\n        required: ['eventName', 'eventDate', 'venue', 'pax', 'reportTime', 'startTime', 'dishes'],\n        additionalProperties: false\n      }\n    }\n  }\n}) }}",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'openai/gpt-6-luna',\n  temperature: 0,\n  messages: [\n    { role: 'system', content: $('Set system prompt').first().json.systemPrompt },\n    { role: 'user', content: 'Extract the order details from this message:\\n\\n' + $json.Order }\n  ],\n  response_format: {\n    type: 'json_schema',\n    json_schema: {\n      name: 'order',\n      strict: true,\n      schema: {\n        type: 'object',\n        properties: {\n          eventName: { type: 'string' },\n          eventDate: { type: 'string' },\n          venue: { type: 'string' },\n          pax: { type: 'string' },\n          reportTime: { type: 'string' },\n          startTime: { type: 'string' },\n          dishes: {\n            type: 'array',\n            items: {\n              type: 'object',\n              properties: {\n                name: { type: 'string' },\n                sub: { type: 'string' },\n                category: { type: 'string' },\n                diet: { type: 'string', enum: ['V', 'N'] },\n                dietConfidence: { type: 'string', enum: ['high', 'low'] }\n              },\n              required: ['name', 'sub', 'category', 'diet', 'dietConfidence'],\n              additionalProperties: false\n            }\n          }\n        },\n        required: ['eventName', 'eventDate', 'venue', 'pax', 'reportTime', 'startTime', 'dishes'],\n        additionalProperties: false\n      }\n    }\n  },\n  usage: { include: true }\n}) }}",
         "options": {}
       },
       "id": "a1f1c001-0000-4000-8000-000000000020",
@@ -57,9 +115,9 @@
       "typeVersion": 4.2,
       "position": [
         440,
-        0
+        -160
       ],
-      "notes": "Calls the SAME /api/parse endpoint (and therefore the same SYSTEM_PROMPT and ORDER_SCHEMA) that the Vercel-hosted web app's app.js uses, so the n8n form and the web app can never again read orders by two different sets of rules. The system prompt text itself lives in the 'Set system prompt' node right before this one, copied verbatim from app.js's SYSTEM_PROMPT constant — when that constant changes, paste the update here too."
+      "notes": "Calls the SAME /api/parse endpoint (and therefore the same SYSTEM_PROMPT and ORDER_SCHEMA) that the Vercel-hosted web app's app.js uses, so the n8n form and the web app can never again read orders by two different sets of rules. The system prompt text itself lives in the 'Set system prompt' node right before this one, copied verbatim from app.js's SYSTEM_PROMPT constant \u2014 when that constant changes, paste the update here too. usage: { include: true } asks OpenRouter to append token counts to the response, used by Build replacements to show cost on the completion screen."
     },
     {
       "parameters": {
@@ -71,12 +129,12 @@
       "typeVersion": 2,
       "position": [
         220,
-        0
+        -160
       ]
     },
     {
       "parameters": {
-        "jsCode": "// The HTTP Request node returns OpenRouter's own chat-completion shape:\n// choices[0].message.content is a JSON string (enforced by response_format).\nconst content = $json.choices[0].message.content;\nconst parsed = JSON.parse(content);\nlet dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\n// Egg named in the dish is non-veg, whatever the model said. The word\n// boundary keeps \"Eggless\" and \"Eggplant\" veg.\nconst EGG = /\\b(eggs?|anda|omelett?es?|omelets?)\\b/i;\nfor (const d of dishes) if (EGG.test(d.name)) d.diet = 'N';\n\n// Unless the form permits duplicates, keep only the first card per dish name.\nconst allowDuplicates = ($('On form submission').first().json['Duplicate Dishes'] || []).length > 0;\nif (!allowDuplicates) {\n  const seen = new Set();\n  dishes = dishes.filter(d => {\n    const key = d.name.trim().toLowerCase().replace(/\\s+/g, ' ');\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\n\nparsed.dishes = dishes;\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// \"Order 5\" -> order_5.pdf; no order number -> order_15_10_2026_12-12PM.pdf (IST).\nconst orderNo = ((parsed.eventName || '').match(/\\d+/) || [])[0];\nconst fileName = (orderNo\n  ? 'order_' + orderNo\n  : 'order_' + DateTime.now().setZone('Asia/Kolkata').toFormat('dd_MM_yyyy_hh-mma')) + '.pdf';\n\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards', fileName, parsedAt: Date.now() } }];"
+        "jsCode": "// The HTTP Request node returns OpenRouter's own chat-completion shape:\n// choices[0].message.content is a JSON string (enforced by response_format),\n// and (because the request set usage: { include: true }) a usage object with\n// real token counts, appended to the final chunk/response.\nconst content = $json.choices[0].message.content;\nconst parsed = JSON.parse(content);\nlet dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\n// Egg named in the dish is non-veg, whatever the model said. The word\n// boundary keeps \"Eggless\" and \"Eggplant\" veg.\nconst EGG = /\\b(eggs?|anda|omelett?es?|omelets?)\\b/i;\nfor (const d of dishes) if (EGG.test(d.name)) d.diet = 'N';\n\n// Unless the form permits duplicates, keep only the first card per dish name.\nconst allowDuplicates = ($('On form submission').first().json['Duplicate Dishes'] || []).length > 0;\nif (!allowDuplicates) {\n  const seen = new Set();\n  dishes = dishes.filter(d => {\n    const key = d.name.trim().toLowerCase().replace(/\\s+/g, ' ');\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\n\nparsed.dishes = dishes;\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// \"Order 5\" -> order_5.pdf; no order number -> order_15_10_2026_12-12PM.pdf (IST).\nconst orderNo = ((parsed.eventName || '').match(/\\d+/) || [])[0];\nconst fileName = (orderNo\n  ? 'order_' + orderNo\n  : 'order_' + DateTime.now().setZone('Asia/Kolkata').toFormat('dd_MM_yyyy_hh-mma')) + '.pdf';\n\n// Same pricing / cache-rate the web app's usage note shows: $0.10 input,\n// $0.01 cached input, $0.50 output per 1M tokens; ~95 USD->INR.\nconst usage = $json.usage || {};\nconst inTok = usage.prompt_tokens || 0;\nconst outTok = usage.completion_tokens || 0;\nconst totalTok = usage.total_tokens || (inTok + outTok);\nconst cachedTok = (usage.prompt_tokens_details && usage.prompt_tokens_details.cached_tokens) || 0;\nconst freshInTok = Math.max(0, inTok - cachedTok);\nconst costUsd = freshInTok / 1e6 * 0.10 + cachedTok / 1e6 * 0.01 + outTok / 1e6 * 0.50;\nconst costInr = costUsd * 95;\nconst usageNote = `Tokens: ${inTok} in + ${outTok} out = ${totalTok} total · Cost: $${costUsd.toFixed(4)} (₹${costInr.toFixed(2)})`;\n\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards', fileName, parsedAt: Date.now(), usageNote } }];"
       },
       "id": "a1f1c001-0000-4000-8000-000000000002",
       "name": "Build replacements",
@@ -84,7 +142,7 @@
       "typeVersion": 2,
       "position": [
         660,
-        0
+        -160
       ]
     },
     {
@@ -115,7 +173,7 @@
         "operation": "write",
         "sandboxId": "={{ $json.sandboxId }}",
         "path": "/home/user/order.json",
-        "content": "={{ JSON.stringify($('Build replacements').item.json.order) }}"
+        "content": "={{ JSON.stringify($('Build replacements').item.json.order || $('Build onepage').item.json.order) }}"
       },
       "id": "a1f1c001-0000-4000-8000-000000000011",
       "name": "Write order.json",
@@ -130,14 +188,15 @@
           "id": "REPLACE_WITH_YOUR_E2B_CREDENTIAL_ID",
           "name": "E2B account"
         }
-      }
+      },
+      "notes": "render.js picks the document (dish-card sheet vs onepage poster) by whether order.json has an `onepage` key or a `dishes` array, so this one write step and the render step after it work for both branches with no extra switching."
     },
     {
       "parameters": {
         "resource": "code",
         "operation": "runCommand",
         "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}",
-        "command": "=cd /home/user && OUTPUT_PATH=/home/user/{{ $('Build replacements').item.json.fileName }} node render.js",
+        "command": "=cd /home/user && OUTPUT_PATH=/home/user/{{ $('Build replacements').item.json.fileName || $('Build onepage').item.json.fileName }} node render.js",
         "allowInternetAccess": false,
         "killAfterRun": false
       },
@@ -161,7 +220,7 @@
         "resource": "file",
         "operation": "download",
         "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}",
-        "remotePath": "=/home/user/{{ $('Build replacements').item.json.fileName }}",
+        "remotePath": "=/home/user/{{ $('Build replacements').item.json.fileName || $('Build onepage').item.json.fileName }}",
         "binaryPropertyName": "data"
       },
       "id": "a1f1c001-0000-4000-8000-000000000013",
@@ -202,7 +261,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Name the download after the order, not the sandbox's file path.\nconst item = $input.first();\nitem.binary.data.fileName = $('Build replacements').first().json.fileName;\nitem.binary.data.mimeType = 'application/pdf';\n\n// Where the time went. submittedAt is the form trigger's own stamp; parsedAt\n// is set by Build replacements right after the AI step returns.\nconst sec = (ms) => Math.round(ms / 100) / 10;\nconst now = Date.now();\nconst submittedAt = Date.parse($('On form submission').first().json.submittedAt);\nconst parsedAt = $('Build replacements').first().json.parsedAt;\nconst render = $('Run render.js').first().json;\nconst steps = (String(render.stdout || '').match(/TIMINGS (\\{.*\\})/) || [])[1];\nitem.json.timings = {\n  totalSec: sec(now - submittedAt),\n  aiParseSec: sec(parsedAt - submittedAt),\n  e2bTotalSec: sec(now - parsedAt),\n  renderCommandSec: sec(render.executionTimeMs || 0),\n  renderStepsMs: steps ? JSON.parse(steps) : null,\n};\nconsole.log('Soul Chef timings ' + JSON.stringify(item.json.timings));\nreturn [item];"
+        "jsCode": "// Name the download after the order, not the sandbox's file path. Reads\n// from whichever branch actually ran (Build replacements for Dish Cards,\n// Build onepage for Onepage Poster) since only one of the two has output.\nconst item = $input.first();\nconst built = $('Build replacements').first(false)?.json || $('Build onepage').first(false)?.json;\nitem.binary.data.fileName = built.fileName;\nitem.binary.data.mimeType = 'application/pdf';\n\n// Where the time went. submittedAt is the form trigger's own stamp; parsedAt\n// is set by whichever Build step ran right after its own work finishes.\nconst sec = (ms) => Math.round(ms / 100) / 10;\nconst now = Date.now();\nconst submittedAt = Date.parse($('On form submission').first().json.submittedAt);\nconst parsedAt = built.parsedAt;\nconst render = $('Run render.js').first().json;\nconst steps = (String(render.stdout || '').match(/TIMINGS (\\{.*\\})/) || [])[1];\nitem.json.timings = {\n  totalSec: sec(now - submittedAt),\n  aiParseSec: sec(parsedAt - submittedAt),\n  e2bTotalSec: sec(now - parsedAt),\n  renderCommandSec: sec(render.executionTimeMs || 0),\n  renderStepsMs: steps ? JSON.parse(steps) : null,\n};\nitem.json.review = built.review || [];\nitem.json.usageNote = built.usageNote || ''; // empty for Onepage Poster — no AI call, nothing to report\nconsole.log('Soul Chef timings ' + JSON.stringify(item.json.timings));\nreturn [item];"
       },
       "id": "a1f1c001-0000-4000-8000-000000000015",
       "name": "Name PDF",
@@ -217,8 +276,8 @@
       "parameters": {
         "operation": "completion",
         "respondWith": "returnBinary",
-        "completionTitle": "Your dish cards are ready",
-        "completionMessage": "={{ 'The PDF is downloading. The sheet is A2 portrait, 16.531 x 23.385 in (42.0 x 59.4 cm); print at 100% on A2. Each card is 7.93 x 5.58 in (20.1 x 14.2 cm), 8 to a sheet - cut along the card edges.' + ($('Build replacements').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Build replacements').item.json.review.join(', ') : '') + '\\n\\n<a href=\"https://automations.autive.io/form/generate-menu-cards\" style=\"display:inline-block;margin-top:12px;padding:10px 18px;background:#A98B4F;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;\">Generate another order</a>' }}",
+        "completionTitle": "Your PDF is ready",
+        "completionMessage": "={{ 'The PDF is downloading.' + ($('Name PDF').item.json.review.length ? '\\n\\nPlease double-check the veg/non-veg mark on: ' + $('Name PDF').item.json.review.join(', ') : '') + ($('Name PDF').item.json.usageNote ? '\\n\\n' + $('Name PDF').item.json.usageNote : '') + '\\n\\n<a href=\"https://automations.autive.io/form/generate-menu-cards\" style=\"display:inline-block;margin-top:12px;padding:10px 18px;background:#A98B4F;color:#fff;border-radius:6px;text-decoration:none;font-weight:600;\">Generate another order</a>' }}",
         "inputDataFieldName": "data",
         "options": {
           "customCss": "@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');\n\n:root { --container-width: 95%; --padding-card: 32px; }\n.container { max-width: 1100px; }\n\nbody, .container {\n  background: #F3EBDD !important;\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #2F2A24 !important;\n}\n\n.n8n-form, form, .form-wrapper, .container > div {\n  background: #ffffff !important;\n  border-radius: 12px !important;\n  box-shadow: 0 1px 3px rgba(0,0,0,0.08) !important;\n  border: 1px solid #e7e0d2 !important;\n}\n\nh1, h2, .form-title, [class*=\"title\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #2F2A24 !important;\n  font-weight: 600 !important;\n}\n\np, [class*=\"description\"], [class*=\"message\"] {\n  font-family: 'Poppins', system-ui, sans-serif !important;\n  color: #57503f !important;\n}\n\na { color: #A98B4F !important; }"
@@ -240,7 +299,36 @@
       "main": [
         [
           {
+            "node": "Which mode?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Which mode?": {
+      "main": [
+        [
+          {
+            "node": "Build onepage",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
             "node": "Set system prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build onepage": {
+      "main": [
+        [
+          {
+            "node": "Create sandbox",
             "type": "main",
             "index": 0
           }

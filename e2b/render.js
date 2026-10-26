@@ -1,16 +1,27 @@
 /*
  * Standalone PDF renderer, run inside an E2B sandbox via `node render.js`.
  *
- * Ported from api/pdf.js (the retired Vercel function) — same card markup,
- * PRINT geometry, colours and fitNames() shrink-to-fit logic, verbatim.
- * Keep this in step with index.html's own <script> block if the design
- * changes, the same way api/pdf.js used to.
+ * Ported from app.js's own card-rendering functions (cardShell, brandMark,
+ * dishCard) verbatim — kept in step by hand, since this runs in a plain
+ * Node/Puppeteer environment with no DOM/browser, so app.js's code cannot be
+ * imported directly. If the card design changes in app.js, copy the same
+ * change here, then rebuild the E2B template (see e2b.Dockerfile's header).
+ *
+ * Renders TWO kinds of document, chosen by the shape of order.json:
+ *   - a dish-card sheet (order.json has `dishes`), same as before
+ *   - a onepage counter poster (order.json has `onepage: { title, items }`),
+ *     ported from app.js's parseOnepage()/renderOnepage() — no AI call on
+ *     either side; the n8n workflow's Build replacements node does the same
+ *     first-block-is-title parsing app.js does, client-side, before writing
+ *     order.json.
  *
  * Expects two files already written into the sandbox (by the n8n workflow's
  * "Write order.json" step) before this runs:
- *   /home/user/order.json   - the parsed order, same shape OpenRouter returns
- *                              (eventDate/venue/pax/dishes[])
- *   /home/user/assets/*.png - the card artwork, baked into the E2B template
+ *   /home/user/order.json   - either the parsed dish-card order (same shape
+ *                              OpenRouter returns: eventDate/venue/pax/dishes[])
+ *                              or { onepage: { title, items: [{name, desc}] } }
+ *   /home/user/assets/*.png - the card + onepage artwork, baked into the E2B
+ *                              template
  *   /home/user/assets/tailwind.css, fonts.css
  *                           - the page's CSS and fonts, generated at template
  *                              build time by build-assets.js, so a render
@@ -76,7 +87,9 @@ export const TAILWIND_THEME = {
   fontFamily: {
     display: ['"Cormorant Garamond"', 'Georgia', 'serif'],
     sans: ['Jost', 'system-ui', 'sans-serif'],
-    script: ['Caveat', 'cursive'],
+    // kept in step with index.html's own Tailwind config — Agbalumo is used
+    // for the onepage poster's title/item names only, not the dish cards
+    script: ['Agbalumo', 'cursive'],
     poppins: ['Poppins', 'system-ui', 'sans-serif'],
     playfair: ['"Playfair Display"', 'Georgia', 'serif'],
   },
@@ -150,9 +163,9 @@ function cardShell(inner, extra = '', frameClass = '') {
 }
 
 function brandMark() {
-  return `<div class="relative w-full pt-[2pt]">
+  return `<div class="relative w-full pt-[20pt]">
     ${TOQUE}
-    <p class="mt-[8pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[1pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
     <p class="mt-[${GAP_FOR_ELEMENTS}pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
       &mdash; Stress Free Experience For Your Event &mdash;
     </p>
@@ -187,7 +200,6 @@ function dishCard(d) {
     <div class="relative flex h-full w-full flex-col items-center">
       <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]">${EDGE_SPRIG}</div>
       <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]">${EDGE_SPRIG_R}</div>
-      ${BOTTOM_RULE}
 
       <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
         <span class="flex h-[25pt] w-[25pt] items-center justify-center border-[2.5pt] border-solid ${dotBorder}">
@@ -196,9 +208,7 @@ function dishCard(d) {
         <span class="font-sans text-[19pt] font-bold uppercase leading-none tracking-[0.12em] ${dotText}">${dotLabel}</span>
       </div>
 
-      <!-- pb keeps the centred stack clear of the bottom rule, which is
-           absolutely positioned and so reserves no space of its own -->
-      <div class="flex w-full flex-1 flex-col items-center justify-center pb-[34pt]">
+      <div class="flex w-full flex-1 flex-col items-center justify-center">
         ${brandMark()}
 
         <div class="mt-[${GAP_FOR_ELEMENTS}pt] flex w-full justify-center">
@@ -215,6 +225,10 @@ function dishCard(d) {
             ${d.note ? `<p class="mt-[5pt] text-center font-display text-[19pt] italic leading-tight text-ink">${d.note}</p>` : ''}
           </div>
         </div>
+      </div>
+
+      <div class="relative z-10 mb-[40pt] flex flex-col items-center">
+        ${BOTTOM_RULE}
       </div>
     </div>`);
 }
@@ -288,6 +302,41 @@ export function buildDocument(order) {
 </head><body><div id="cards">${sheetsHtml}</div></body></html>`;
 }
 
+/* ---------- the onepage counter poster, ported verbatim from app.js's
+   renderOnepage() — one static A4 page, no sheet/card grid at all. ---------- */
+export function buildOnepageDocument(onepage) {
+  const { title, items } = onepage;
+  const imageFile = (items && items[0] && items[0].image) || 'puris_image.png';
+
+  const itemsHtml = (items || []).map((item) => `
+    <p class="mt-6 text-center font-script text-[28pt] font-normal uppercase leading-tight text-[#E6762C]">${item.name}</p>
+    ${item.desc ? `<p class="mt-1 text-center font-sans text-[14pt] font-bold italic text-[#1F5D8C]">${item.desc}</p>` : ''}
+  `).join('');
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Soul Chef Onepage</title>
+<link rel="stylesheet" href="${ASSET_BASE}/fonts.css">
+<style>
+  @page { size: 8.27in 11.69in; margin: 0; }
+  body { margin: 0; background: #fff; }
+</style>
+<link rel="stylesheet" href="${ASSET_BASE}/tailwind.css">
+</head><body>
+  <div class="onepage-sheet relative box-border flex w-[8.27in] h-[11.69in] flex-none flex-col items-center bg-white px-[0.6in] py-[0.6in]">
+    <div class="relative flex w-full items-center">
+      <img src="${ASSET_BASE}/onepage/soulcheflogo.png" alt="" aria-hidden="true"
+        class="h-[1.4in] w-auto shrink-0">
+      <p class="flex-1 pr-[1.4in] text-center font-script text-[32pt] font-normal uppercase leading-tight text-[#1F5D8C]">${title}</p>
+    </div>
+    ${itemsHtml}
+    <div class="flex flex-1 items-end justify-center pb-[0.6in]">
+      <img src="${ASSET_BASE}/onepage/${imageFile}" alt="" aria-hidden="true"
+        class="h-[4.5in] w-auto">
+    </div>
+  </div>
+</body></html>`;
+}
+
 /* Shrink any dish name that still does not fit its card, same algorithm as
    fitNames() in index.html — run here via page.evaluate so it measures the
    real rendered layout inside Chromium, not an approximation. */
@@ -321,9 +370,7 @@ const FIT_NAMES_SCRIPT = `
   })();
 `;
 
-async function renderPdf(order) {
-  const html = buildDocument(order);
-
+async function renderPdf(html) {
   const browser = await puppeteer.launch({
     headless: true,
     args: ['--no-sandbox', '--disable-setuid-sandbox'],
@@ -365,13 +412,26 @@ async function main() {
   lap('startup');
   const raw = fs.readFileSync(ORDER_PATH, 'utf8');
   const parsed = JSON.parse(raw);
-  const order = normalizeOrder(parsed);
 
-  if (!order.dishes.length) {
-    throw new Error('No dishes found in the order.');
+  // order.json's shape picks the document: { onepage: {...} } for the
+  // counter poster, everything else (dishes[]) for the dish-card sheet —
+  // same two modes app.js's Generate button switches between locally
+  let html;
+  if (parsed.onepage) {
+    const { title, items } = parsed.onepage;
+    if (!title && !(items || []).length) {
+      throw new Error('Onepage poster needs a title and at least one item.');
+    }
+    html = buildOnepageDocument(parsed.onepage);
+  } else {
+    const order = normalizeOrder(parsed);
+    if (!order.dishes.length) {
+      throw new Error('No dishes found in the order.');
+    }
+    html = buildDocument(order);
   }
 
-  const pdf = await renderPdf(order);
+  const pdf = await renderPdf(html);
   lap('closeChrome');
   fs.writeFileSync(OUTPUT_PATH, pdf);
   lap('writeFile');
