@@ -44,14 +44,46 @@
     },
     {
       "parameters": {
-        "jsCode": "// The AI chain returns its JSON under .output when a structured parser is used.\nconst parsed = $json.output || $json;\nlet dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\n// Egg named in the dish is non-veg, whatever the model said. The word\n// boundary keeps \"Eggless\" and \"Eggplant\" veg.\nconst EGG = /\\b(eggs?|anda|omelett?es?|omelets?)\\b/i;\nfor (const d of dishes) if (EGG.test(d.name)) d.diet = 'N';\n\n// Unless the form permits duplicates, keep only the first card per dish name.\nconst allowDuplicates = ($('On form submission').first().json['Duplicate Dishes'] || []).length > 0;\nif (!allowDuplicates) {\n  const seen = new Set();\n  dishes = dishes.filter(d => {\n    const key = d.name.trim().toLowerCase().replace(/\\s+/g, ' ');\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\n\nparsed.dishes = dishes;\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// \"Order 5\" -> order_5.pdf; no order number -> order_15_10_2026_12-12PM.pdf (IST).\nconst orderNo = ((parsed.eventName || '').match(/\\d+/) || [])[0];\nconst fileName = (orderNo\n  ? 'order_' + orderNo\n  : 'order_' + DateTime.now().setZone('Asia/Kolkata').toFormat('dd_MM_yyyy_hh-mma')) + '.pdf';\n\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards', fileName, parsedAt: Date.now() } }];"
+        "method": "POST",
+        "url": "https://soulchef-pdf-api.vercel.app/api/parse",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  model: 'openai/gpt-6-luna',\n  temperature: 0,\n  messages: [\n    { role: 'system', content: $('Set system prompt').first().json.systemPrompt },\n    { role: 'user', content: 'Extract the order details from this message:\\n\\n' + $json.Order }\n  ],\n  response_format: {\n    type: 'json_schema',\n    json_schema: {\n      name: 'order',\n      strict: true,\n      schema: {\n        type: 'object',\n        properties: {\n          eventName: { type: 'string' },\n          eventDate: { type: 'string' },\n          venue: { type: 'string' },\n          pax: { type: 'string' },\n          reportTime: { type: 'string' },\n          startTime: { type: 'string' },\n          dishes: {\n            type: 'array',\n            items: {\n              type: 'object',\n              properties: {\n                name: { type: 'string' },\n                sub: { type: 'string' },\n                category: { type: 'string' },\n                diet: { type: 'string', enum: ['V', 'N'] },\n                dietConfidence: { type: 'string', enum: ['high', 'low'] }\n              },\n              required: ['name', 'sub', 'category', 'diet', 'dietConfidence'],\n              additionalProperties: false\n            }\n          }\n        },\n        required: ['eventName', 'eventDate', 'venue', 'pax', 'reportTime', 'startTime', 'dishes'],\n        additionalProperties: false\n      }\n    }\n  }\n}) }}",
+        "options": {}
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000020",
+      "name": "Parse order",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "notes": "Calls the SAME /api/parse endpoint (and therefore the same SYSTEM_PROMPT and ORDER_SCHEMA) that the Vercel-hosted web app's app.js uses, so the n8n form and the web app can never again read orders by two different sets of rules. The system prompt text itself lives in the 'Set system prompt' node right before this one, copied verbatim from app.js's SYSTEM_PROMPT constant — when that constant changes, paste the update here too."
+    },
+    {
+      "parameters": {
+        "jsCode": "// This string MUST stay byte-for-byte identical to SYSTEM_PROMPT in app.js\n// (the web app's shared logic, also used by the Vercel /api/parse endpoint\n// this workflow calls). Keeping one copy per environment is what let the\n// n8n form and the web app silently diverge before — update both together.\nreturn [{\n  json: {\n    ...$json,\n    systemPrompt: `You extract catering order details from free-form WhatsApp text and return JSON only.\n\n- THE TEXT MAY HOLD SEVERAL ORDERS, not just one. A paste often carries a whole\n  forwarded chat: several messages back to back, each starting with a line like\n  \"[10/8, 1:23 PM] +91 75068 67906: *Order 3: 9 October 2026*\" and each with its\n  own \"Menu for the event\" and its own \"*Note* -\" block. Read EVERY message to\n  the very end of the text and merge all of their menus into ONE dishes array,\n  in the order they appear. Never stop after the first message. A six-message\n  paste whose menus hold 30 items must return all 30, not the first message's 4.\n\nRules:\n- dishes: every menu item from every message, in menu order. Ignore non-menu\n  lines (name, phone, pax, location/venue, report/start time). A \"Note\" block\n  ends only ITS OWN message — skip to the next message's header and keep going;\n  it never ends the whole text.\n- The same item may appear more than once, whether repeated within one message\n  or across several messages (an AM and a PM slot both listing \"Tea/Coffee\").\n  Emit EVERY occurrence as its own entry, in the order it appears. Do not\n  deduplicate dishes.\n- A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line\n  with no bullet: \"Welcome Drinks\", \"Soup\", \"Starters on Buffet\", \"Main Course\n  on Buffet\", \"Accompaniments\", \"Deserts\", \"Desserts\". Never emit a dish whose\n  name is just a heading. A heading that is followed by its items on later\n  lines still only sets the category, e.g.\n\n    Soup\n\n    Broccoli & Roasted Almond Soup with Garlic Stick\n\n  is ONE dish, \"Broccoli & Roasted Almond Soup with Garlic Stick\", in the\n  \"Soup\" category — not a dish called \"Soup\".\n- An \"&\"-joined list of items on one menu line is SEVERAL SEPARATE DISHES, one\n  per segment, each emitted as its own entry (same category, same position in\n  menu order) -- UNLESS the \"&\" instead joins two words that only make sense\n  together as a single dish's name. Test each segment on its own: if it reads\n  as a complete, independently-orderable dish by itself, split it out.\n    \"Choley & Bread Kulcha (Amritsari Black Chole) & Biryani & Raita (Add Paneer)\"\n    -> FOUR dishes: \"Choley\", \"Bread Kulcha\", \"Biryani\", \"Raita\" (every\n    parenthetical is dropped entirely regardless of splitting -- see below).\n    \"Broccoli & Roasted Almond Soup with Garlic Stick\" -> ONE dish, because\n    \"Broccoli\" alone and \"Roasted Almond Soup with Garlic Stick\" alone are not\n    each a complete dish -- the \"&\" is part of this one soup's name. Keep its\n    \"&\" as written.\n- name: the dish name, Title Cased, with any parenthetical detail REMOVED and\n  any trailing serving phrase REMOVED (see sub).\n- Every parenthetical is DROPPED ENTIRELY, on every dish, never kept as sub:\n  \"Mix Fruit Tetra Pack (Real or Tropicana brand only)\" -> name \"Mix Fruit\n  Tetra Pack\", sub \"\". \"Raita (Add Paneer)\" -> name \"Raita\", sub \"\".\n- sub: ONLY a trailing serving phrase, which must be CUT from the name:\n      \"Blueberry Panncotta Served in Shot Glass\" -> name \"Blueberry Panncotta\",\n      sub \"Served in Shot Glass\".\n      \"Chocolate mousse in shot glass\" -> name \"Chocolate Mousse\",\n      sub \"Served in Shot Glass\".\n  Empty string when there is none, including every parenthetical case above.\n- category: which course the dish belongs to, as one of EXACTLY these labels:\n  \"Welcome Drink\", \"Soup\", \"Starters\", \"Main Course\", \"Accompaniments\", \"Desserts\".\n  Map the message's wording onto that list: \"Welcome Drinks\" -> \"Welcome Drink\",\n  \"Starters on Buffet\" -> \"Starters\", \"Main Course on Buffet\" -> \"Main Course\",\n  \"Deserts\" -> \"Desserts\". Items after a heading inherit it until the next heading.\n  If a dish fits none of them, use the closest one; never invent a new label.\n- diet: \"N\" ONLY when the dish NAME ITSELF names meat, fish, poultry, seafood or egg.\n  Chicken, mutton, lamb, prawn, fish, crab, bacon, ham, egg, anda and omelette\n  in the name are \"N\".\n  Everything else is \"V\". This is the single most important rule, so apply it\n  literally:\n    * A dish a restaurant MIGHT make with a hidden animal ingredient is still\n      \"V\" when its name does not say so. \"Pad Thai Noodles\" is \"V\", not \"N\" —\n      fish sauce is not in the name. Likewise \"Caesar Salad\" (anchovy),\n      \"Kimchi Fried Rice\" (shrimp paste), \"Panna Cotta\" (gelatin): all \"V\".\n      Record the doubt in dietConfidence, NEVER in diet.\n    * Read the whole menu before deciding. An all-vegetarian menu almost never\n      contains one hidden non-veg dish, so a borderline name on such a menu is\n      \"V\".\n    * EGG NAMED IN THE DISH makes it \"N\": \"Egg Curry\", \"Masala Omelette\",\n      \"Egg Fried Rice\", \"Egg Bhurji\" and \"Anda Curry\" are all \"N\". Egg that is\n      only HIDDEN inside a dish does NOT: pasta, ravioli, noodles, mayonnaise,\n      cake or custard whose name does not say egg stay \"V\", so \"Pumpkin Ravioli\n      with Sage Butter Cream Sauce\" is \"V\". \"Eggless\" and \"Eggplant\" are not\n      egg: \"Eggless Chocolate Cake\" and \"Eggplant Parmigiana\" are \"V\".\n  Marking a vegetarian dish \"N\" is the worst error you can make: it puts a red\n  NON-VEG mark on a veg buffet table. When unsure, choose \"V\" and flag it.\n- dietConfidence: \"high\" when the dish name makes the diet obvious, \"low\" when\n  a hidden animal ingredient is plausible even though the name does not say so\n  (Caesar Salad may contain anchovy; a mousse or panna cotta may contain\n  gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or\n  shrimp paste). \"low\" is how you express doubt — the diet field stays \"V\".\nThe remaining fields describe the event as a whole, not a single dish. When the\ntext holds several messages, take each one from the FIRST message that has it.\n- eventDate: the date as written, e.g. \"28 September 2026\". Empty string if absent.\n- venue: the place, from a \"Venue:\" or \"Location:\" line. Shorten it for a card:\n  drop a leading floor number and turn \"Birla Centurion-Worli\" into\n  \"Birla Centurion, Worli\". If the line is only a URL (e.g. a Google Maps link)\n  with no readable place name, return an empty string.\n- pax: the guest count, from a line like \"No. of pax:\", \"No of pax:\" or \"Pax:\".\n  Keep any bracketed note, upper case, e.g. \"38 pax (2 Jain)\" -> \"38 PAX · 2 JAIN\",\n  and \"32\" -> \"32 PAX\". Empty string if absent.\n- reportTime: the crew's reporting time, from a \"Report time:\" line, upper case\n  and tidied, e.g. \"10:00 am\" -> \"10:00 AM\", \"10 am\" -> \"10 AM\". Empty string if absent.\n- startTime: the event start time, from a \"Start time:\" line, same formatting.\n  Empty string if absent.\n- eventName: a short label for the order, e.g. \"Order 5\". Empty string if absent.\n\nReturn ONLY the JSON object. No prose, no code fences.`\n  }\n}];"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000023",
+      "name": "Set system prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The HTTP Request node returns OpenRouter's own chat-completion shape:\n// choices[0].message.content is a JSON string (enforced by response_format).\nconst content = $json.choices[0].message.content;\nconst parsed = JSON.parse(content);\nlet dishes = (parsed.dishes || []).filter(d => d && d.name);\nif (dishes.length === 0) throw new Error('No dishes found in the order text.');\n\n// Egg named in the dish is non-veg, whatever the model said. The word\n// boundary keeps \"Eggless\" and \"Eggplant\" veg.\nconst EGG = /\\b(eggs?|anda|omelett?es?|omelets?)\\b/i;\nfor (const d of dishes) if (EGG.test(d.name)) d.diet = 'N';\n\n// Unless the form permits duplicates, keep only the first card per dish name.\nconst allowDuplicates = ($('On form submission').first().json['Duplicate Dishes'] || []).length > 0;\nif (!allowDuplicates) {\n  const seen = new Set();\n  dishes = dishes.filter(d => {\n    const key = d.name.trim().toLowerCase().replace(/\\s+/g, ' ');\n    if (seen.has(key)) return false;\n    seen.add(key);\n    return true;\n  });\n}\n\nparsed.dishes = dishes;\n\n// Dishes the model was unsure about, so they can be checked before printing.\nconst review = dishes\n  .filter(d => d.dietConfidence === 'low')\n  .map(d => d.name + ' (' + (d.diet === 'N' ? 'NON-VEG' : 'VEG') + ')');\n\nconst title = [parsed.eventName, parsed.eventDate, parsed.venue].filter(Boolean).join(' - ');\n\n// \"Order 5\" -> order_5.pdf; no order number -> order_15_10_2026_12-12PM.pdf (IST).\nconst orderNo = ((parsed.eventName || '').match(/\\d+/) || [])[0];\nconst fileName = (orderNo\n  ? 'order_' + orderNo\n  : 'order_' + DateTime.now().setZone('Asia/Kolkata').toFormat('dd_MM_yyyy_hh-mma')) + '.pdf';\n\nreturn [{ json: { order: parsed, count: dishes.length, review, title: title || 'Dish Cards', fileName, parsedAt: Date.now() } }];"
       },
       "id": "a1f1c001-0000-4000-8000-000000000002",
       "name": "Build replacements",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        440,
+        660,
         0
       ]
     },
@@ -201,58 +233,6 @@
         0
       ],
       "webhookId": "7d2e9f4b-1a3c-4b6d-8e5f-9a0c2e4b6f81"
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "=Extract the order details from this message:\n\n{{ $json.Order }}",
-        "messages": {
-          "messageValues": [
-            {
-              "message": "You extract catering order details from free-form WhatsApp text and return JSON only.\n\n- THE TEXT MAY HOLD SEVERAL ORDERS, not just one. A paste often carries a whole\n  forwarded chat: several messages back to back, each starting with a line like\n  \"[10/8, 1:23 PM] +91 75068 67906: *Order 3: 9 October 2026*\" and each with its\n  own \"Menu for the event\" and its own \"*Note* -\" block. Read EVERY message to\n  the very end of the text and merge all of their menus into ONE dishes array,\n  in the order they appear. Never stop after the first message. A six-message\n  paste whose menus hold 30 items must return all 30, not the first message's 4.\n\nRules:\n- dishes: every menu item from every message, in menu order. Ignore non-menu\n  lines (name, phone, pax, location/venue, report/start time). A \"Note\" block\n  ends only ITS OWN message — skip to the next message's header and keep going;\n  it never ends the whole text.\n- The same item may appear more than once, whether repeated within one message\n  or across several messages (an AM and a PM slot both listing \"Tea/Coffee\").\n  Emit EVERY occurrence as its own entry, in the order it appears. Do not\n  deduplicate dishes.\n- A COURSE HEADING IS NOT A DISH. Headings are often bold or on their own line\n  with no bullet: \"Welcome Drinks\", \"Soup\", \"Starters on Buffet\", \"Main Course\n  on Buffet\", \"Accompaniments\", \"Deserts\", \"Desserts\". Never emit a dish whose\n  name is just a heading. A heading that is followed by its items on later\n  lines still only sets the category, e.g.\n\n    Soup\n\n    Broccoli & Roasted Almond Soup with Garlic Stick\n\n  is ONE dish, \"Broccoli & Roasted Almond Soup with Garlic Stick\", in the\n  \"Soup\" category — not a dish called \"Soup\".\n- name: the dish name, Title Cased, with any parenthetical detail REMOVED and\n  any trailing serving phrase REMOVED (see sub). Keep \"&\" as written.\n- sub: the detail pulled off the name. Either\n    - a parenthetical: \"(Focaccia & Garlic bread)\" -> \"Focaccia | Garlic Bread\", or\n    - a serving phrase, which must be CUT from the name:\n      \"Blueberry Panncotta Served in Shot Glass\" -> name \"Blueberry Panncotta\",\n      sub \"Served in Shot Glass\".\n      \"Chocolate mousse in shot glass\" -> name \"Chocolate Mousse\",\n      sub \"Served in Shot Glass\".\n  Empty string when there is none.\n- category: which course the dish belongs to, as one of EXACTLY these labels:\n  \"Welcome Drink\", \"Soup\", \"Starters\", \"Main Course\", \"Accompaniments\", \"Desserts\".\n  Map the message's wording onto that list: \"Welcome Drinks\" -> \"Welcome Drink\",\n  \"Starters on Buffet\" -> \"Starters\", \"Main Course on Buffet\" -> \"Main Course\",\n  \"Deserts\" -> \"Desserts\". Items after a heading inherit it until the next heading.\n  If a dish fits none of them, use the closest one; never invent a new label.\n- diet: \"N\" ONLY when the dish NAME ITSELF names meat, fish, poultry, seafood or egg.\n  Chicken, mutton, lamb, prawn, fish, crab, bacon, ham, egg, anda and omelette\n  in the name are \"N\".\n  Everything else is \"V\". This is the single most important rule, so apply it\n  literally:\n    * A dish a restaurant MIGHT make with a hidden animal ingredient is still\n      \"V\" when its name does not say so. \"Pad Thai Noodles\" is \"V\", not \"N\" —\n      fish sauce is not in the name. Likewise \"Caesar Salad\" (anchovy),\n      \"Kimchi Fried Rice\" (shrimp paste), \"Panna Cotta\" (gelatin): all \"V\".\n      Record the doubt in dietConfidence, NEVER in diet.\n    * Read the whole menu before deciding. An all-vegetarian menu almost never\n      contains one hidden non-veg dish, so a borderline name on such a menu is\n      \"V\".\n    * EGG NAMED IN THE DISH makes it \"N\": \"Egg Curry\", \"Masala Omelette\",\n      \"Egg Fried Rice\", \"Egg Bhurji\" and \"Anda Curry\" are all \"N\". Egg that is\n      only HIDDEN inside a dish does NOT: pasta, ravioli, noodles, mayonnaise,\n      cake or custard whose name does not say egg stay \"V\", so \"Pumpkin Ravioli\n      with Sage Butter Cream Sauce\" is \"V\". \"Eggless\" and \"Eggplant\" are not\n      egg: \"Eggless Chocolate Cake\" and \"Eggplant Parmigiana\" are \"V\".\n  Marking a vegetarian dish \"N\" is the worst error you can make: it puts a red\n  NON-VEG mark on a veg buffet table. When unsure, choose \"V\" and flag it.\n- dietConfidence: \"high\" when the dish name makes the diet obvious, \"low\" when\n  a hidden animal ingredient is plausible even though the name does not say so\n  (Caesar Salad may contain anchovy; a mousse or panna cotta may contain\n  gelatin; Pad Thai and many South-East Asian dishes carry fish sauce or\n  shrimp paste). \"low\" is how you express doubt — the diet field stays \"V\".\nThe remaining fields describe the event as a whole, not a single dish. When the\ntext holds several messages, take each one from the FIRST message that has it.\n- eventDate: the date as written, e.g. \"28 September 2026\". Empty string if absent.\n- venue: the place, from a \"Venue:\" or \"Location:\" line. Shorten it for a card:\n  drop a leading floor number and turn \"Birla Centurion-Worli\" into\n  \"Birla Centurion, Worli\". If the line is only a URL (e.g. a Google Maps link)\n  with no readable place name, return an empty string.\n- pax: the guest count, from a line like \"No. of pax:\", \"No of pax:\" or \"Pax:\".\n  Keep any bracketed note, upper case, e.g. \"38 pax (2 Jain)\" -> \"38 PAX · 2 JAIN\",\n  and \"32\" -> \"32 PAX\". Empty string if absent.\n- reportTime: the crew's reporting time, from a \"Report time:\" line, upper case\n  and tidied, e.g. \"10:00 am\" -> \"10:00 AM\", \"10 am\" -> \"10 AM\". Empty string if absent.\n- startTime: the event start time, from a \"Start time:\" line, same formatting.\n  Empty string if absent.\n- eventName: a short label for the order, e.g. \"Order 5\". Empty string if absent.\n\nReturn ONLY the JSON object. No prose, no code fences."
-            }
-          ]
-        },
-        "hasOutputParser": true
-      },
-      "id": "a1f1c001-0000-4000-8000-000000000020",
-      "name": "Parse order",
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.5,
-      "position": [
-        220,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "model": "openai/gpt-6-luna",
-        "options": {
-          "temperature": 0
-        }
-      },
-      "id": "a1f1c001-0000-4000-8000-000000000021",
-      "name": "OpenRouter Chat Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
-      "typeVersion": 1,
-      "position": [
-        180,
-        200
-      ]
-    },
-    {
-      "parameters": {
-        "schemaType": "manual",
-        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"eventName\": {\n      \"type\": \"string\"\n    },\n    \"eventDate\": {\n      \"type\": \"string\"\n    },\n    \"venue\": {\n      \"type\": \"string\"\n    },\n    \"pax\": {\n      \"type\": \"string\"\n    },\n    \"reportTime\": {\n      \"type\": \"string\"\n    },\n    \"startTime\": {\n      \"type\": \"string\"\n    },\n    \"dishes\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"name\": {\n            \"type\": \"string\"\n          },\n          \"sub\": {\n            \"type\": \"string\"\n          },\n          \"category\": {\n            \"type\": \"string\"\n          },\n          \"diet\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"V\",\n              \"N\"\n            ]\n          },\n          \"dietConfidence\": {\n            \"type\": \"string\",\n            \"enum\": [\n              \"high\",\n              \"low\"\n            ]\n          }\n        },\n        \"required\": [\n          \"name\",\n          \"sub\",\n          \"category\",\n          \"diet\",\n          \"dietConfidence\"\n        ]\n      }\n    }\n  },\n  \"required\": [\n    \"eventName\",\n    \"eventDate\",\n    \"venue\",\n    \"pax\",\n    \"reportTime\",\n    \"startTime\",\n    \"dishes\"\n  ]\n}"
-      },
-      "id": "a1f1c001-0000-4000-8000-000000000022",
-      "name": "Order schema",
-      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
-      "typeVersion": 1.2,
-      "position": [
-        340,
-        200
-      ]
     }
   ],
   "connections": {
@@ -260,7 +240,29 @@
       "main": [
         [
           {
+            "node": "Set system prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set system prompt": {
+      "main": [
+        [
+          {
             "node": "Parse order",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse order": {
+      "main": [
+        [
+          {
+            "node": "Build replacements",
             "type": "main",
             "index": 0
           }
@@ -333,39 +335,6 @@
           {
             "node": "Return PDF",
             "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Parse order": {
-      "main": [
-        [
-          {
-            "node": "Build replacements",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "OpenRouter Chat Model": {
-      "ai_languageModel": [
-        [
-          {
-            "node": "Parse order",
-            "type": "ai_languageModel",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Order schema": {
-      "ai_outputParser": [
-        [
-          {
-            "node": "Parse order",
-            "type": "ai_outputParser",
             "index": 0
           }
         ]

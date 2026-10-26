@@ -457,6 +457,21 @@ function dishCard(d) {
 const form = document.getElementById('orderForm');
 const orderEl = document.getElementById('order');
 const dupToggle = document.getElementById('dupToggle');
+const onepageBtn = document.getElementById('onepageBtn');
+const onepageWrap = document.getElementById('onepageWrap');
+const onepageSheet = document.getElementById('onepageSheet');
+const onepageBox = document.getElementById('onepageBox');
+const cardsPreviewGroup = document.getElementById('cardsPreviewGroup');
+
+/* toggles a flex panel's visibility with an inline style, not the `hidden`
+   attribute: these panels carry Tailwind's `flex` utility, which has the
+   same specificity as the UA stylesheet's `[hidden]{display:none}` rule and
+   wins the tie since it is injected later — so `.hidden = true` alone
+   silently does nothing on them. */
+function setPanelVisible(el, visible) {
+  if (!el) return;
+  el.style.display = visible ? '' : 'none';
+}
 const cardsEl = document.getElementById('cards');
 const wrapEl = document.getElementById('previewWrap');
 const previewBoxEl = document.getElementById('previewBox');
@@ -520,6 +535,137 @@ function dedupeDishes(dishes) {
     return true;
   });
 }
+
+const ONEPAGE_IMAGES = [
+  { file: 'puris_image.png', label: 'Pani Puri Counter' },
+];
+
+let onepageMode = false;
+const ONEPAGE_PLACEHOLDER =
+  'PANI PURI COUNTER\n\nPani Puri\nStuffing: Aloo & Ragda  Paani: Teekha Pudina & Meetha Pani\n\nPALAK PATTA CHAAT';
+const CARDS_PLACEHOLDER = orderEl.getAttribute('placeholder');
+
+if (onepageBtn) {
+  onepageBtn.addEventListener('click', () => {
+    onepageMode = !onepageMode;
+    onepageBtn.setAttribute('aria-pressed', String(onepageMode));
+    onepageBtn.classList.toggle('bg-gold', onepageMode);
+    onepageBtn.classList.toggle('border-gold', onepageMode);
+    generateLabel.textContent = onepageMode ? 'Generate onepage' : 'Generate cards';
+    orderEl.placeholder = onepageMode ? ONEPAGE_PLACEHOLDER : CARDS_PLACEHOLDER;
+    // switching modes always starts from a clean preview
+    wrapEl.hidden = true;
+    setPanelVisible(onepageWrap, false);
+    setPanelVisible(cardsPreviewGroup, true);
+    printBtn.hidden = true;
+    countEl.textContent = '';
+    sheetNote.textContent = '';
+    if (usageNote) usageNote.textContent = '';
+  });
+}
+
+/* Splits the order text into { title, items: [{ name, desc }] } with no AI
+   call: first non-empty line is the title, every blank-line-separated block
+   after it is one item — its first line the name, any further lines (joined
+   with a space) its description. */
+/* "sev puri" -> "Sev Puri": capitalises the first letter of every word,
+   so typing in lowercase still prints correctly on the poster. */
+function titleCase(str) {
+  return str.replace(/\w\S*/g, (word) => word[0].toUpperCase() + word.slice(1).toLowerCase());
+}
+
+function parseOnepage(text) {
+  const blocks = text.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  if (!blocks.length) return { title: '', items: [] };
+
+  // the first block is the counter's own heading, e.g. "Pani Puri Counter" —
+  // never an item, even if it happens to span more than one line
+  const title = titleCase(blocks[0].split('\n')[0].trim());
+
+  const items = blocks.slice(1).map((block) => {
+    const lines = block.split('\n').map((l) => l.trim()).filter(Boolean);
+    return { name: titleCase(lines[0] || ''), desc: lines.slice(1).join(' ') };
+  }).filter((item) => item.name);
+
+  return { title, items };
+}
+
+/* Builds the onepage poster: logo top-left, centred title, centred items
+   (name + optional description line), centred illustration — one static
+   page, not a sheet of cards. */
+function renderOnepage() {
+  const { title, items } = parseOnepage(orderEl.value);
+
+  if (!title && !items.length) {
+    errEl.hidden = false;
+    errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+    errEl.textContent = 'Paste a counter title, then one blank line, then each item (name, then optionally a description line).';
+    wrapEl.hidden = true;
+    printBtn.hidden = true;
+    return;
+  }
+
+  const imageFile = ONEPAGE_IMAGES[0]?.file;
+  const itemsHtml = items.map((item) => `
+    <p class="mt-6 text-center font-script text-[28pt] font-normal uppercase leading-tight text-[#E6762C]">${item.name}</p>
+    ${item.desc ? `<p class="mt-1 text-center font-sans text-[14pt] font-bold italic text-[#1F5D8C]">${item.desc}</p>` : ''}
+  `).join('');
+
+  // a real A4 portrait page (8.27 x 11.69in), not just floating content, so
+  // the on-screen preview shows the same page bounds the PDF prints
+  onepageSheet.innerHTML = `
+    <div class="onepage-sheet relative box-border flex w-[8.27in] h-[11.69in] flex-none flex-col items-center bg-white px-[0.6in] py-[0.6in] shadow-md ring-1 ring-slate-300">
+      <div class="relative flex w-full items-center">
+        <img src="${ASSET_BASE}/onepage/soulcheflogo.png" alt="" aria-hidden="true"
+          class="h-[1.4in] w-auto shrink-0">
+        <p class="flex-1 pr-[1.4in] text-center font-script text-[32pt] font-normal uppercase leading-tight text-[#1F5D8C]">${title}</p>
+      </div>
+      ${itemsHtml}
+      <div class="flex flex-1 items-end justify-center pb-[0.6in]">
+        <img src="${ASSET_BASE}/onepage/${imageFile}" alt="" aria-hidden="true"
+          class="h-[4.5in] w-auto">
+      </div>
+    </div>
+  `;
+
+  errEl.hidden = true;
+  wrapEl.hidden = false;
+  setPanelVisible(cardsPreviewGroup, false);
+  setPanelVisible(onepageWrap, true);
+  printBtn.hidden = true;
+  countEl.textContent = `${items.length} item${items.length === 1 ? '' : 's'}`;
+
+  fitOnepageScale();
+
+  // the PDF download starts the moment the preview is up, same as the
+  // dish-card flow — no extra click needed
+  autoDownloadOnepagePdf();
+}
+
+/* Scales the fixed-size A4 sheet down to fit the preview box's real width,
+   the same problem the dish-card sheets solve with --sheet-scale — the PDF
+   itself is unaffected since it prints printableOnepageDocument()'s own
+   unscaled markup, not this transformed on-screen copy. */
+function fitOnepageScale() {
+  const sheet = onepageSheet.querySelector('.onepage-sheet');
+  if (!sheet || !onepageBox) return;
+  const PX_PER_IN_ONEPAGE = 96;
+  const sheetWidthPx = 8.27 * PX_PER_IN_ONEPAGE;
+  const style = getComputedStyle(onepageBox);
+  const padL = parseFloat(style.paddingLeft), padR = parseFloat(style.paddingRight);
+  const available = onepageBox.clientWidth - padL - padR;
+  if (!available) return;
+  const scale = Math.min(1, (available - 12) / sheetWidthPx);
+  sheet.style.transform = `scale(${scale})`;
+  sheet.style.transformOrigin = 'top center';
+  // the scaled box still reserves its full unscaled footprint (8.27 x 11.69in)
+  // by default — both the dead space below it and the horizontal scrollbar
+  // come from that, so the wrapper is shrunk to the scaled size on both axes
+  onepageSheet.style.width = (8.27 * PX_PER_IN_ONEPAGE * scale) + 'px';
+  onepageSheet.style.height = (11.69 * PX_PER_IN_ONEPAGE * scale) + 'px';
+}
+
+window.addEventListener('resize', () => { if (!onepageWrap.hidden) fitOnepageScale(); });
 
 /* the button doubles as the progress indicator, first while the order is
    read and then while the server prints the PDF */
@@ -705,6 +851,8 @@ async function renderCards(data, opts = {}) {
   ).join('');
 
   wrapEl.hidden = false;
+  setPanelVisible(cardsPreviewGroup, true);
+  setPanelVisible(onepageWrap, false);
   printBtn.hidden = opts.preview ? true : false;
 
   const n = data.dishes.length;
@@ -987,6 +1135,85 @@ async function openPdfTab() {
   }
 }
 
+/* ---------- the onepage poster, printed to a real A4 PDF the same way ----------
+   Reuses /api/pdf exactly as the dish cards do: the page's own fonts/Tailwind
+   config travel in <head>, and the sheet's outerHTML becomes the whole body. */
+function printableOnepageDocument() {
+  const head = [...document.head.querySelectorAll('link, script, style')]
+    .map((el) => el.outerHTML).join('\n');
+  const sheet = onepageSheet.querySelector('.onepage-sheet');
+
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Soul Chef Onepage</title>
+<base href="${location.origin}/">
+${head}
+<style>
+  @page { size: 8.27in 11.69in; margin: 0; }
+  body { margin: 0; background: #fff; }
+  .onepage-sheet { box-shadow: none !important; }
+</style>
+</head><body>${sheet ? sheet.outerHTML : ''}</body></html>`;
+}
+
+let onepagePdfUrl = null;
+let onepagePdfKey = null;
+
+function onepagePdfFileName() {
+  return 'Soul Chef - Onepage.pdf';
+}
+
+let onepagePdfPromise = null;
+async function buildOnepagePdf() {
+  const html = printableOnepageDocument();
+
+  if (onepagePdfUrl && onepagePdfKey === html) return onepagePdfUrl;
+  if (onepagePdfPromise) return onepagePdfPromise;
+
+  onepagePdfPromise = (async () => {
+    const res = await fetch(API_BASE + '/api/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ html }),
+    });
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(detail.slice(0, 300) || ('The server could not make the PDF (' + res.status + ').'));
+    }
+    if (onepagePdfUrl) URL.revokeObjectURL(onepagePdfUrl);
+    onepagePdfUrl = URL.createObjectURL(await res.blob());
+    onepagePdfKey = html;
+    return onepagePdfUrl;
+  })();
+
+  try {
+    return await onepagePdfPromise;
+  } finally {
+    onepagePdfPromise = null;
+  }
+}
+
+function downloadOnepagePdf(url) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = onepagePdfFileName();
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function autoDownloadOnepagePdf() {
+  setBusy(true, 'Making the PDF…');
+  try {
+    downloadOnepagePdf(await buildOnepagePdf());
+  } catch (err) {
+    errEl.hidden = false;
+    errEl.className = 'mt-2 rounded-md bg-red-50 px-2 py-1.5 text-[10px] text-red-700 ring-1 ring-red-200';
+    errEl.textContent = err.message;
+  } finally {
+    setBusy(false);
+  }
+}
+
 /* ---------- the printed page is sized to the poster, so print == preview ---------- */
 const printPageStyle = document.createElement('style');
 document.head.appendChild(printPageStyle);
@@ -1080,7 +1307,15 @@ orderEl.addEventListener('input', () => {
   if (usageNote) usageNote.textContent = '';
 });
 
-form.addEventListener('submit', (e) => { e.preventDefault(); render({ scroll: true }); });
+form.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (onepageMode) {
+    renderOnepage();
+    onepageWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  render({ scroll: true });
+});
 
 // the preview is already on screen by now, so this just prints it
 printBtn.addEventListener('click', openPdfTab);
