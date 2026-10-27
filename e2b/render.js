@@ -1,4 +1,6 @@
-/*
+/* Cmd to test on local bunx tailwindcss -c tailwind.config.cjs -i tailwind.input.css -o assets/tailwind.css --minify
+node make-test-html.js
+
  * Standalone PDF renderer, run inside an E2B sandbox via `node render.js`.
  *
  * Ported from app.js's own card-rendering functions (cardShell, brandMark,
@@ -105,7 +107,7 @@ export const TAILWIND_THEME = {
 
 /* ---------- reused artwork/ornament snippets, ported from index.html ---------- */
 const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
-  class="mx-auto h-[44pt] w-auto">`;
+  class="mx-auto h-[30pt] w-auto">`;
 
 /* Sits on the frame's bottom border rather than in the flex flow. The artwork
    is a 3:1 box (2172x724) whose visible line sits near its middle with
@@ -113,7 +115,7 @@ const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" ar
    (inset 10pt) and only the leaf rises above it — centring the box instead
    would push 38pt of padding past the card edge, clipping the stem. */
 const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-hidden="true"
-  class="absolute bottom-[-14pt] left-1/2 h-auto w-[230pt] -translate-x-1/2">`;
+  class="h-auto w-[230pt]">`;
 
 const EDGE_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
   class="h-[78pt] w-auto">`;
@@ -227,7 +229,7 @@ function dishCard(d) {
         </div>
       </div>
 
-      <div class="relative z-10 mb-[40pt] flex flex-col items-center">
+      <div class="relative z-10 mt-[-12pt] flex w-full flex-col items-center px-[26pt]">
         ${BOTTOM_RULE}
       </div>
     </div>`);

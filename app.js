@@ -7,16 +7,13 @@ const LEAF = `<svg viewBox="0 0 40 16" class="h-[15pt] w-[40pt]" aria-hidden="tr
   <path d="M20 7 C23 7, 25 5.5, 26 3 C23 3, 21 4.5, 20 7 Z" fill="#A98B4F" opacity="0.55"/>
 </svg>`;
 
-/* absolute, not relative: this markup is serialized and posted to the
-   Vercel /api/pdf function, which renders it in a sandboxed Chromium with
-   no access to this page's own origin, so a relative "assets/..." path
-   resolves to nothing there even though it works fine on-screen.
-   Locally, server.js already serves this project's own assets/ folder, so
-   localhost uses that instead of the deployed Vercel copy — matching
-   API_BASE's own localhost/production split below. */
-const ASSET_BASE = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-  ? location.origin + '/assets'
-  : 'https://soulchef-pdf-api.vercel.app/assets';
+/* absolute, not relative: this markup is serialized and posted to
+   server.js's /api/pdf handler, which renders it in a sandboxed Chromium
+   with no access to this page's own origin, so a relative "assets/..."
+   path resolves to nothing there even though it works fine on-screen.
+   This app is local-only (served by server.js), so this is always the
+   local origin's own /assets folder. */
+const ASSET_BASE = location.origin + '/assets';
 
 const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
   class="mx-auto h-[30pt] w-auto">`;
@@ -92,16 +89,10 @@ const BADGE = {
    The order text is read by a model rather than by regexes, so wording the
    rules never anticipated (an unlisted course heading, a dish whose diet is
    a judgment call) is still read correctly.
-   The key lives server-side (server.js locally, the Vercel function in
-   production) and forwards this to OpenRouter, so the key is never in the
-   page and the request comes from a real origin.
-   API_BASE points at the deployed Vercel functions directly so this page
-   works wherever it is served from (local server.js, n8n, a static host) —
-   not only when it happens to share an origin with the functions. */
-const API_BASE = location.hostname === 'localhost' || location.hostname === '127.0.0.1'
-  ? ''
-  : 'https://soulchef-pdf-api.vercel.app';
-const PARSE_URL = API_BASE + '/api/parse';
+   The key lives server-side (server.js) and forwards this to OpenRouter,
+   so the key is never in the page. This app is local-only, so the parse
+   endpoint is always this same origin's own /api/parse. */
+const PARSE_URL = '/api/parse';
 const MODEL = 'openai/gpt-6-luna';
 
 const SYSTEM_PROMPT = `You extract catering order details from free-form WhatsApp text and return JSON only.
@@ -447,7 +438,7 @@ function dishCard(d) {
         </div>
       </div>
 
-      <div class="relative z-10 mb-[40pt] flex flex-col items-center">
+      <div class="pointer-events-none absolute mt-[10rem] left-0 z-10 flex w-full flex-col items-center">
         ${BOTTOM_RULE}
       </div>
     </div>`);

@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><title>Soul Chef Dish Cards</title>
+<link rel="stylesheet" href="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/fonts.css">
+<style>
+  :root {
+    --brush: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='28 23 444 87' preserveAspectRatio='none'%3E%3Cpath fill='%23000' d='M60 25 C45 25 35 33 35 42 C35 47 40 51 45 54 C38 57 30 62 30 70 C30 77 38 82 48 84 C40 88 35 93 35 98 C35 106 50 108 70 108 L430 108 C450 108 465 106 465 98 C465 93 460 88 452 84 C462 82 470 77 470 70 C470 62 462 57 455 54 C460 51 465 47 465 42 C465 33 455 25 440 25 Z'/%3E%3C/svg%3E");
+  }
+  .card-frame { --w: 2pt; --r: 16pt; }
+  .card-frame::before, .card-frame::after, .card-frame > i {
+    content: ''; position: absolute; width: var(--r); height: var(--r); border: var(--w) solid #A98B4F; background: transparent;
+  }
+  .card-frame::before { top: 0; left: 0; border-left: none; border-top: none; border-bottom-right-radius: var(--r); }
+  .card-frame::after { top: 0; right: 0; border-right: none; border-top: none; border-bottom-left-radius: var(--r); }
+  .card-frame > i:first-child { bottom: 0; left: 0; border-left: none; border-bottom: none; border-top-right-radius: var(--r); }
+  .card-frame > i:last-child { bottom: 0; right: 0; border-right: none; border-bottom: none; border-top-left-radius: var(--r); }
+  .card-frame.is-plain::before, .card-frame.is-plain::after, .card-frame.is-plain > i { display: none; }
+
+  @page { size: 16.53in 23.39in; margin: 0; }
+  body { margin: 0; background: #fff; }
+  #cards { display: block; }
+  .sheet-frame {
+    width: auto !important; height: auto !important; overflow: hidden !important;
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .sheet-frame + .sheet-frame { break-before: page; page-break-before: always; }
+  .sheet-frame:last-child { break-after: avoid; page-break-after: avoid; }
+  .sheet { margin: 0 !important; overflow: hidden !important; }
+  .dish-card { break-inside: avoid; page-break-inside: avoid; }
+</style>
+<!-- after the inline <style>, where the Tailwind CDN used to inject its own -->
+<link rel="stylesheet" href="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/tailwind.css">
+</head><body><div id="cards"><div class="sheet-frame"><div class="sheet box-border grid justify-center bg-cream origin-top-left w-sheet h-sheet-h gap-[0.18in] p-[0.2in_0.2455in_0.15in] [grid-template-columns:repeat(2,7.93in)] [grid-template-rows:repeat(4,min-content)_1fr]"><div class="dish-card relative box-border flex w-card h-card-h flex-none flex-col items-center overflow-hidden bg-card px-[15pt] py-[15pt] text-[43pt] ">
+    <div class="card-frame  pointer-events-none absolute inset-[10pt] border-[2pt] border-solid border-gold"><i></i><i></i></div>
+    
+    <div class="relative flex h-full w-full flex-col items-center">
+      <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]"><img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto"></div>
+      <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]"><img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto [transform:scaleX(-1)]"></div>
+
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
+        <span class="flex h-[25pt] w-[25pt] items-center justify-center border-[2.5pt] border-solid border-veg">
+          <span class="h-[15pt] w-[15pt] rounded-full bg-veg"></span>
+        </span>
+        <span class="font-sans text-[19pt] font-bold uppercase leading-none tracking-[0.12em] text-veg">VEG</span>
+      </div>
+
+      <div class="flex w-full flex-1 flex-col items-center justify-center">
+        <div class="relative w-full pt-[20pt]">
+    <img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
+  class="mx-auto h-[30pt] w-auto">
+    <p class="mt-[1pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[20pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
+      &mdash; Stress Free Experience For Your Event &mdash;
+    </p>
+  </div>
+
+        <div class="mt-[20pt] flex w-full justify-center">
+          <span class="ribbon w-[330pt] [-webkit-mask-image:var(--brush)] [mask-image:var(--brush)] [-webkit-mask-size:100%_100%] [mask-size:100%_100%] [-webkit-mask-repeat:no-repeat] [mask-repeat:no-repeat] bg-[#D9A842] whitespace-nowrap px-[20pt] py-[11pt] text-center font-sans text-[17pt] font-semibold uppercase leading-none tracking-[0.14em] text-white">
+            Starters
+          </span>
+        </div>
+
+        <div class="relative z-10 mt-[20pt] flex w-full flex-col items-center px-[26pt]">
+          <div class="flex h-[128pt] w-full flex-col items-center justify-start overflow-hidden">
+            <h3 class="dish-name text-balance text-center font-playfair text-[38pt] font-bold leading-[1.15] text-ink">
+              Vada
+            </h3>
+            
+          </div>
+        </div>
+      </div>
+
+      <div class="relative z-10 mt-[-12pt] flex w-full flex-col items-center px-[26pt]">
+        <img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/card bottom line.png" alt="" aria-hidden="true"
+  class="h-auto w-[230pt]">
+      </div>
+    </div>
+  </div><div class="dish-card relative box-border flex w-card h-card-h flex-none flex-col items-center overflow-hidden bg-card px-[15pt] py-[15pt] text-[43pt] ">
+    <div class="card-frame  pointer-events-none absolute inset-[10pt] border-[2pt] border-solid border-gold"><i></i><i></i></div>
+    
+    <div class="relative flex h-full w-full flex-col items-center">
+      <div class="pointer-events-none absolute bottom-[5pt] left-[5pt]"><img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto"></div>
+      <div class="pointer-events-none absolute bottom-[5pt] right-[5pt]"><img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
+  class="h-[78pt] w-auto [transform:scaleX(-1)]"></div>
+
+      <div class="absolute left-[12pt] top-[12pt] z-10 flex items-center gap-[9pt]">
+        <span class="flex h-[25pt] w-[25pt] items-center justify-center border-[2.5pt] border-solid border-veg">
+          <span class="h-[15pt] w-[15pt] rounded-full bg-veg"></span>
+        </span>
+        <span class="font-sans text-[19pt] font-bold uppercase leading-none tracking-[0.12em] text-veg">VEG</span>
+      </div>
+
+      <div class="flex w-full flex-1 flex-col items-center justify-center">
+        <div class="relative w-full pt-[20pt]">
+    <img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
+  class="mx-auto h-[30pt] w-auto">
+    <p class="mt-[1pt] text-center font-display text-[32pt] font-semibold leading-none tracking-[0.26em] text-ink">SOUL CHEF</p>
+    <p class="mt-[20pt] text-center font-sans text-[13pt] font-medium uppercase leading-none tracking-[0.08em] text-gold">
+      &mdash; Stress Free Experience For Your Event &mdash;
+    </p>
+  </div>
+
+        <div class="mt-[20pt] flex w-full justify-center">
+          <span class="ribbon w-[330pt] [-webkit-mask-image:var(--brush)] [mask-image:var(--brush)] [-webkit-mask-size:100%_100%] [mask-size:100%_100%] [-webkit-mask-repeat:no-repeat] [mask-repeat:no-repeat] bg-[#D9A842] whitespace-nowrap px-[20pt] py-[11pt] text-center font-sans text-[17pt] font-semibold uppercase leading-none tracking-[0.14em] text-white">
+            Starters
+          </span>
+        </div>
+
+        <div class="relative z-10 mt-[20pt] flex w-full flex-col items-center px-[26pt]">
+          <div class="flex h-[128pt] w-full flex-col items-center justify-start overflow-hidden">
+            <h3 class="dish-name text-balance text-center font-playfair text-[38pt] font-bold leading-[1.15] text-ink">
+              Samosa
+            </h3>
+            
+          </div>
+        </div>
+      </div>
+
+      <div class="relative z-10 mt-[-12pt] flex w-full flex-col items-center px-[26pt]">
+        <img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/card bottom line.png" alt="" aria-hidden="true"
+  class="h-auto w-[230pt]">
+      </div>
+    </div>
+  </div><div class="sheet-footer col-[1/-1] row-[5] self-end flex items-end justify-center px-[6pt] pt-[4pt] pb-[2pt]">
+    <img src="file://C:/Users/kulp/2_Kulp_Labs_Pvt_Ltd_Projects/soul-chef-pdf-api/e2b/assets/footer.png" alt="" aria-hidden="true"
+      class="block max-h-[48pt] w-full object-contain">
+  </div></div></div></div></body></html>

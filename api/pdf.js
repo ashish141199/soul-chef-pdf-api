@@ -23,10 +23,9 @@
 import chromium from '@sparticuz/chromium';
 import puppeteer from 'puppeteer-core';
 
-/* assets/*.png live in this same Vercel project (see vercel.json / the
-   assets/ folder next to api/), so Chromium can reach them over the network
-   regardless of where the calling page (index.html, n8n, ...) is hosted. */
-const ASSET_BASE = 'https://soulchef-pdf-api.vercel.app/assets';
+/* This app is local-only: server.js serves assets/*.png itself, on the
+   same PORT it listens on (default 3000, see server.js). */
+const ASSET_BASE = `http://localhost:${process.env.PORT || 3000}/assets`;
 
 /* ==================== PRINT SIZE — keep in step with index.html ====================
    All lengths are INCHES. See index.html's own PRINT block for the full

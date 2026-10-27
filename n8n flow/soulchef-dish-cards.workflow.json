@@ -9,13 +9,14 @@
           "values": [
             {
               "fieldLabel": "Mode",
-              "fieldType": "dropdown",
+              "fieldType": "radio",
               "fieldOptions": {
                 "values": [
                   { "option": "Dish Cards" },
                   { "option": "Onepage Poster" }
                 ]
               },
+              "fieldValue": "Dish Cards",
               "requiredField": true
             },
             {
@@ -103,7 +104,9 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "https://soulchef-pdf-api.vercel.app/api/parse",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openRouterApi",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({\n  model: 'openai/gpt-6-luna',\n  temperature: 0,\n  messages: [\n    { role: 'system', content: $('Set system prompt').first().json.systemPrompt },\n    { role: 'user', content: 'Extract the order details from this message:\\n\\n' + $json.Order }\n  ],\n  response_format: {\n    type: 'json_schema',\n    json_schema: {\n      name: 'order',\n      strict: true,\n      schema: {\n        type: 'object',\n        properties: {\n          eventName: { type: 'string' },\n          eventDate: { type: 'string' },\n          venue: { type: 'string' },\n          pax: { type: 'string' },\n          reportTime: { type: 'string' },\n          startTime: { type: 'string' },\n          dishes: {\n            type: 'array',\n            items: {\n              type: 'object',\n              properties: {\n                name: { type: 'string' },\n                sub: { type: 'string' },\n                category: { type: 'string' },\n                diet: { type: 'string', enum: ['V', 'N'] },\n                dietConfidence: { type: 'string', enum: ['high', 'low'] }\n              },\n              required: ['name', 'sub', 'category', 'diet', 'dietConfidence'],\n              additionalProperties: false\n            }\n          }\n        },\n        required: ['eventName', 'eventDate', 'venue', 'pax', 'reportTime', 'startTime', 'dishes'],\n        additionalProperties: false\n      }\n    }\n  },\n  usage: { include: true }\n}) }}",
@@ -117,7 +120,13 @@
         440,
         -160
       ],
-      "notes": "Calls the SAME /api/parse endpoint (and therefore the same SYSTEM_PROMPT and ORDER_SCHEMA) that the Vercel-hosted web app's app.js uses, so the n8n form and the web app can never again read orders by two different sets of rules. The system prompt text itself lives in the 'Set system prompt' node right before this one, copied verbatim from app.js's SYSTEM_PROMPT constant \u2014 when that constant changes, paste the update here too. usage: { include: true } asks OpenRouter to append token counts to the response, used by Build replacements to show cost on the completion screen."
+      "credentials": {
+        "openRouterApi": {
+          "id": "REPLACE_WITH_YOUR_OPENROUTER_CREDENTIAL_ID",
+          "name": "OpenRouter account"
+        }
+      },
+      "notes": "Calls OpenRouter directly (no Vercel proxy). The system prompt text lives in the 'Set system prompt' node right before this one, copied verbatim from app.js's SYSTEM_PROMPT constant \u2014 when that constant changes, paste the update here too. usage: { include: true } asks OpenRouter to append token counts to the response, used by Build replacements to show cost on the completion screen."
     },
     {
       "parameters": {
@@ -143,6 +152,19 @@
       "position": [
         660,
         -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Both branches (Build replacements for Dish Cards, Build onepage for\n// Onepage Poster) connect into this one node. Whichever branch actually ran\n// is the only input this node ever receives, so it just passes that item\n// through under one name — everything downstream references ONLY this\n// node, never the two branches directly, so there is no more need to guess\n// which of two possibly-unexecuted nodes produced the data.\nreturn [{ json: $input.first().json }];"
+      },
+      "id": "a1f1c001-0000-4000-8000-000000000040",
+      "name": "Merge build output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        0
       ]
     },
     {
@@ -173,7 +195,7 @@
         "operation": "write",
         "sandboxId": "={{ $json.sandboxId }}",
         "path": "/home/user/order.json",
-        "content": "={{ JSON.stringify($('Build replacements').item.json.order || $('Build onepage').item.json.order) }}"
+        "content": "={{ JSON.stringify($('Merge build output').first().json.order) }}"
       },
       "id": "a1f1c001-0000-4000-8000-000000000011",
       "name": "Write order.json",
@@ -196,7 +218,7 @@
         "resource": "code",
         "operation": "runCommand",
         "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}",
-        "command": "=cd /home/user && OUTPUT_PATH=/home/user/{{ $('Build replacements').item.json.fileName || $('Build onepage').item.json.fileName }} node render.js",
+        "command": "=cd /home/user && OUTPUT_PATH=/home/user/{{ $('Merge build output').first().json.fileName }} node render.js",
         "allowInternetAccess": false,
         "killAfterRun": false
       },
@@ -220,7 +242,7 @@
         "resource": "file",
         "operation": "download",
         "sandboxId": "={{ $('Create sandbox').item.json.sandboxId }}",
-        "remotePath": "=/home/user/{{ $('Build replacements').item.json.fileName || $('Build onepage').item.json.fileName }}",
+        "remotePath": "=/home/user/{{ $('Merge build output').first().json.fileName }}",
         "binaryPropertyName": "data"
       },
       "id": "a1f1c001-0000-4000-8000-000000000013",
@@ -261,7 +283,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Name the download after the order, not the sandbox's file path. Reads\n// from whichever branch actually ran (Build replacements for Dish Cards,\n// Build onepage for Onepage Poster) since only one of the two has output.\nconst item = $input.first();\nconst built = $('Build replacements').first(false)?.json || $('Build onepage').first(false)?.json;\nitem.binary.data.fileName = built.fileName;\nitem.binary.data.mimeType = 'application/pdf';\n\n// Where the time went. submittedAt is the form trigger's own stamp; parsedAt\n// is set by whichever Build step ran right after its own work finishes.\nconst sec = (ms) => Math.round(ms / 100) / 10;\nconst now = Date.now();\nconst submittedAt = Date.parse($('On form submission').first().json.submittedAt);\nconst parsedAt = built.parsedAt;\nconst render = $('Run render.js').first().json;\nconst steps = (String(render.stdout || '').match(/TIMINGS (\\{.*\\})/) || [])[1];\nitem.json.timings = {\n  totalSec: sec(now - submittedAt),\n  aiParseSec: sec(parsedAt - submittedAt),\n  e2bTotalSec: sec(now - parsedAt),\n  renderCommandSec: sec(render.executionTimeMs || 0),\n  renderStepsMs: steps ? JSON.parse(steps) : null,\n};\nitem.json.review = built.review || [];\nitem.json.usageNote = built.usageNote || ''; // empty for Onepage Poster — no AI call, nothing to report\nconsole.log('Soul Chef timings ' + JSON.stringify(item.json.timings));\nreturn [item];"
+        "jsCode": "// Name the download after the order, not the sandbox's file path. Reads\n// from Merge build output, which already picked whichever branch ran\n// (Build replacements for Dish Cards, Build onepage for Onepage Poster).\nconst item = $input.first();\nconst built = $('Merge build output').first().json;\nitem.binary.data.fileName = built.fileName;\nitem.binary.data.mimeType = 'application/pdf';\n\n// Where the time went. submittedAt is the form trigger's own stamp; parsedAt\n// is set by whichever Build step ran right after its own work finishes.\nconst sec = (ms) => Math.round(ms / 100) / 10;\nconst now = Date.now();\nconst submittedAt = Date.parse($('On form submission').first().json.submittedAt);\nconst parsedAt = built.parsedAt;\nconst render = $('Run render.js').first().json;\nconst steps = (String(render.stdout || '').match(/TIMINGS (\\{.*\\})/) || [])[1];\nitem.json.timings = {\n  totalSec: sec(now - submittedAt),\n  aiParseSec: sec(parsedAt - submittedAt),\n  e2bTotalSec: sec(now - parsedAt),\n  renderCommandSec: sec(render.executionTimeMs || 0),\n  renderStepsMs: steps ? JSON.parse(steps) : null,\n};\nitem.json.review = built.review || [];\nitem.json.usageNote = built.usageNote || ''; // empty for Onepage Poster — no AI call, nothing to report\nconsole.log('Soul Chef timings ' + JSON.stringify(item.json.timings));\nreturn [item];"
       },
       "id": "a1f1c001-0000-4000-8000-000000000015",
       "name": "Name PDF",
@@ -328,7 +350,7 @@
       "main": [
         [
           {
-            "node": "Create sandbox",
+            "node": "Merge build output",
             "type": "main",
             "index": 0
           }
@@ -358,6 +380,17 @@
       ]
     },
     "Build replacements": {
+      "main": [
+        [
+          {
+            "node": "Merge build output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge build output": {
       "main": [
         [
           {
