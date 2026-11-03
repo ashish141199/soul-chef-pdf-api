@@ -15,12 +15,16 @@ const LEAF = `<svg viewBox="0 0 40 16" class="h-[15pt] w-[40pt]" aria-hidden="tr
    local origin's own /assets folder. */
 const ASSET_BASE = location.origin + '/assets';
 
+/* same origin: server.js serves both the page and /api/pdf locally, and the
+   Vercel deployment serves both from the same domain too. */
+const API_BASE = location.origin;
+
 const TOQUE = `<img src="${ASSET_BASE}/Cheif_Hat-removebg-preview.png" alt="" aria-hidden="true"
   class="mx-auto h-[30pt] w-auto">`;
 
 /* the rule-and-sprig divider that closes each dish card */
 const BOTTOM_RULE = `<img src="${ASSET_BASE}/card bottom line.png" alt="" aria-hidden="true"
-  class="h-auto w-[230pt]">`;
+  class="absolute bottom-[-14pt] left-1/2 h-auto w-[230pt] -translate-x-1/2">`;
 
 /* a smaller leaf sprig, used in the poster's footer corners */
 const CORNER_SPRIG = `<img src="${ASSET_BASE}/bottom_left_leaf-removebg-preview.png" alt="" aria-hidden="true"
@@ -388,10 +392,10 @@ function dishCard(d) {
   // Starters/Main Course badges flip to red for non-veg dishes; other courses keep a fixed colour.
   const FLIPS_FOR_NONVEG = d.course === 'Starters' || d.course === 'Main Course';
   const badge = (FLIPS_FOR_NONVEG && !d.veg) ? 'bg-nonveg' : (BADGE[d.course] || 'bg-leaf');
-  const dotColor = d.veg ? 'bg-veg' : 'bg-nonveg';
-  const dotBorder = d.veg ? 'border-veg' : 'border-nonveg';
-  const dotText = d.veg ? 'text-veg' : 'text-nonveg';
-  const dotLabel = d.veg ? 'VEG' : 'NON-VEG';
+  const dotColor = jainMode ? 'bg-jain' : d.veg ? 'bg-veg' : 'bg-nonveg';
+  const dotBorder = jainMode ? 'border-jain' : d.veg ? 'border-veg' : 'border-nonveg';
+  const dotText = jainMode ? 'text-jain' : d.veg ? 'text-veg' : 'text-nonveg';
+  const dotLabel = jainMode ? 'JAIN' : d.veg ? 'VEG' : 'NON-VEG';
   return cardShell(`
     <!-- The brand mark, badge and name sit together as one centred group with
          one fixed gap between them, while the rule and diet mark are pinned to
@@ -438,9 +442,7 @@ function dishCard(d) {
         </div>
       </div>
 
-      <div class="pointer-events-none absolute mt-[10rem] left-0 z-10 flex w-full flex-col items-center">
-        ${BOTTOM_RULE}
-      </div>
+      ${BOTTOM_RULE}
     </div>`);
 }
 
@@ -448,6 +450,7 @@ function dishCard(d) {
 const form = document.getElementById('orderForm');
 const orderEl = document.getElementById('order');
 const dupToggle = document.getElementById('dupToggle');
+const jainToggle = document.getElementById('jainToggle');
 const onepageBtn = document.getElementById('onepageBtn');
 const onepageWrap = document.getElementById('onepageWrap');
 const onepageSheet = document.getElementById('onepageSheet');
@@ -500,6 +503,21 @@ if (promptBtn && promptDialog) {
 /* "Permit duplicate dishes" toggle — same default (off) and same rule as
    the n8n workflow's own checkbox: off dedupes identical dish names down to
    one card each; on keeps every occurrence as its own card. */
+/* Jain mode — when on, every card's diet mark is replaced with a single
+   yellow JAIN mark, overriding the veg/non-veg colour and label. */
+let jainMode = false;
+if (jainToggle) {
+  jainToggle.addEventListener('click', () => {
+    jainMode = !jainMode;
+    jainToggle.setAttribute('aria-checked', String(jainMode));
+    jainToggle.classList.toggle('bg-gold', jainMode);
+    jainToggle.classList.toggle('bg-slate-300', !jainMode);
+    const knob = jainToggle.firstElementChild;
+    knob.classList.toggle('translate-x-[3px]', !jainMode);
+    knob.classList.toggle('translate-x-[20px]', jainMode);
+  });
+}
+
 let allowDuplicates = false;
 if (dupToggle) {
   dupToggle.addEventListener('click', () => {

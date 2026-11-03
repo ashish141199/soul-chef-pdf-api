@@ -15,9 +15,35 @@ import http from 'http';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawnSync } from 'child_process';
 
-const PORT = process.env.PORT || 3000;
+const START_PORT = Number(process.env.PORT) || 3000;
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
+
+/* ---------- pick a free port, without touching whatever already owns one ---------- */
+function isPortOccupied(port) {
+  const result = spawnSync(
+    'powershell.exe',
+    [
+      '-NoProfile',
+      '-Command',
+      `Get-NetTCPConnection -LocalPort ${port} -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess`,
+    ],
+    { encoding: 'utf8' }
+  );
+  return Boolean(result.stdout && result.stdout.trim());
+}
+
+function findAvailablePort(startPort) {
+  let port = startPort;
+  while (isPortOccupied(port)) {
+    console.log(`Port ${port} is occupied. Trying ${port + 1}...`);
+    port++;
+  }
+  return port;
+}
+
+const PORT = findAvailablePort(START_PORT);
 
 /* ---------- .env: KEY=value per line, # comments and blanks skipped ---------- */
 function readEnv() {
@@ -181,7 +207,7 @@ function serveFile(urlPath, res) {
   });
 }
 
-http.createServer((req, res) => {
+const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
   if (url.pathname === '/api/parse') {
@@ -196,11 +222,30 @@ http.createServer((req, res) => {
 
   if (req.method !== 'GET') return json(res, 405, { error: 'Use GET.' });
   serveFile(url.pathname, res);
-}).listen(PORT, () => {
-  console.log('Soul Chef dish cards -> http://localhost:' + PORT);
-
-  // Load the render module now rather than on the first Open PDF, so that
-  // click does not pay the import. A failure here is not fatal: the parser
-  // works without it, and the print reports the error itself.
-  getPdfHandler().catch(() => {});
 });
+
+function startServer(port) {
+  server.listen(port, () => {
+    console.log('Soul Chef dish cards -> http://localhost:' + port);
+
+    // Load the render module now rather than on the first Open PDF, so that
+    // click does not pay the import. A failure here is not fatal: the parser
+    // works without it, and the print reports the error itself.
+    getPdfHandler().catch(() => {});
+  });
+}
+
+// the port check above is read-only, so another process can still grab the
+// chosen port in the gap before listen() — fall back to the next one if so
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const nextPort = (server._soulChefPort || PORT) + 1;
+    console.log('Port ' + (nextPort - 1) + ' in use, trying ' + nextPort + '...');
+    server._soulChefPort = nextPort;
+    startServer(nextPort);
+  } else {
+    throw err;
+  }
+});
+
+startServer(PORT);

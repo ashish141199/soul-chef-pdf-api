@@ -25,6 +25,7 @@
             leaf: '#7D9A5F',
             veg: '#2E8B2E',
             nonveg: '#C0392B',
+            jain: '#D9A82A',
             rose: '#D08A8A',
           },
           /* the print geometry, taken from the PRINT block so there is one
@@ -106,6 +107,16 @@
           </button>
           <label class="text-xs text-slate-700">
             Permit duplicate dishes <span class="text-slate-400">(each occurrence is printed as a separate card)</span>
+          </label>
+        </div>
+
+        <div class="mb-3 flex items-center gap-2.5">
+          <button type="button" id="jainToggle" role="switch" aria-checked="false"
+            class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full bg-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gold/40 focus:ring-offset-2">
+            <span class="inline-block h-[18px] w-[18px] translate-x-[3px] transform rounded-full bg-white shadow transition-transform"></span>
+          </button>
+          <label class="text-xs text-slate-700">
+            Jain mode <span class="text-slate-400">(all cards marked yellow JAIN instead of veg/non-veg)</span>
           </label>
         </div>
 
